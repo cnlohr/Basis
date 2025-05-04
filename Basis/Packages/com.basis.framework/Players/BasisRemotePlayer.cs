@@ -67,7 +67,7 @@ namespace Basis.Scripts.BasisSdk.Players
         }
         public async Task CreateAvatar(byte Mode, BasisLoadableBundle BasisLoadableBundle)
         {
-            if (BasisLoadableBundle == null)
+            if (BasisLoadableBundle == null && string.IsNullOrEmpty(BasisLoadableBundle.BasisRemoteBundleEncrypted.CombinedURL))
             {
                 BasisDebug.LogError("trying to create Avatar with empty Bundle");
                 return;

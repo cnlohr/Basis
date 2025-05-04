@@ -663,12 +663,12 @@ MonoBehaviour:
         AssetBundleName: 
         AssetBundleDescription: 
       BasisBundleGenerated: []
-  - UnlockPassword: 57010aaf35d7ed7ebcad86ec34fcf15607519a5b652a6b8a3057d27b60b9f393
+  - UnlockPassword: f393faff7e3637820387f41c4ccde845852ed020b5073a754e632a890ac3ffdb
     BasisRemoteBundleEncrypted:
       IsLocal: 1
-      CombinedURL: https://BasisFramework.b-cdn.net/Avatars/BEE/BEE/Dooly%26Peechiu/1fad23a63de34ae9a722122ff63d265620250301.BEE
+      CombinedURL: https://BasisFramework.b-cdn.net/Avatars/BEE/BEE/Yun/47ec223225fb49b29a596a33f67b8e2a20250427.BEE
     BasisLocalEncryptedBundle:
-      LocalConnectorPath: https://BasisFramework.b-cdn.net/Avatars/BEE/BEE/Dooly%26Peechiu/1fad23a63de34ae9a722122ff63d265620250301.BEE
+      LocalConnectorPath: https://BasisFramework.b-cdn.net/Avatars/BEE/BEE/Yun/47ec223225fb49b29a596a33f67b8e2a20250427.BEE
     BasisBundleConnector:
       UniqueVersion: 
       BasisBundleDescription:

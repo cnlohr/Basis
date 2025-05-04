@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ea7f8ee05ae1754488a389ba53893fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Ip: server1.basisvr.org
+  Ip: basis.jinxxy.com
   Port: 4296
   Password: default_password
   IsHostMode: 0
@@ -283,5 +283,3 @@ MonoBehaviour:
   NormalColor: {r: 0.25490198, g: 0.25490198, b: 0.25490198, a: 0.4509804}
   IsTalkingColor: {r: 0.3529412, g: 0.72156864, b: 0.90588236, a: 0.7490196}
   OutOfRangeColor: {r: 0.105882354, g: 0.23137255, b: 0.29411766, a: 0.7490196}
-  x: 0
-  z: 0

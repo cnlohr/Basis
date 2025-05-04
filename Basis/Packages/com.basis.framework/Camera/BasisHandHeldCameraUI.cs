@@ -13,6 +13,7 @@ public class BasisHandHeldCameraUI
     public Button CloseButton;
     public Button Timer;
     public Button Nameplates;
+    public Button OverrideDesktopOutput;
     public TMP_Dropdown ResolutionDropdown;
     public TMP_Dropdown FormatDropdown;
     public TMP_Dropdown CameraApertureDropdown;
@@ -49,6 +50,7 @@ public class BasisHandHeldCameraUI
         ResetButton.onClick.AddListener(ResetSettings);
         Timer.onClick.AddListener(HHC.Timer);
         Nameplates.onClick.AddListener(HHC.Nameplates);
+        OverrideDesktopOutput.onClick.AddListener(HHC.OnOverrideDesktopOutputButtonPress);
         ResolutionDropdown.onValueChanged.AddListener(HHC.ChangeResolution);
         FormatDropdown.onValueChanged.AddListener(HHC.ChangeFormat);
         CameraApertureDropdown.onValueChanged.AddListener(ChangeAperture);

@@ -7,6 +7,9 @@ using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Drivers;
 using UnityEngine.Rendering;
 using TMPro;
+using UnityEngine.XR;
+using Basis.Scripts.Device_Management;
+
 public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
 {
     public UniversalAdditionalCameraData CameraData;
@@ -29,6 +32,8 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
     public string picturesFolder;
     public int InstanceID;
     public int depth = 24;
+
+    public bool enableRecordingView;
 
     [SerializeField]
     public BasisHandHeldCameraUI HandHeld = new BasisHandHeldCameraUI();
@@ -71,7 +76,14 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         await HandHeld.SaveSettings();
         base.Awake();
         captureCamera.gameObject.SetActive(true);
+        BasisDeviceManagement.OnBootModeChanged += OnBootModeChanged;
     }
+
+    private void OnBootModeChanged(string obj)
+    {
+        OverrideDesktopOutput();
+    }
+
     public new void OnDestroy()
     {
         if (BasisMeshRendererCheck != null)
@@ -82,6 +94,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         {
             renderTexture.Release();
         }
+        BasisDeviceManagement.OnBootModeChanged -= OnBootModeChanged;
         base.OnDestroy();
     }
     public void Timer()
@@ -119,6 +132,48 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
 
         // Reset the countdown text back to "5" after triggering
         countdownText.text = ((int)delaySeconds).ToString();
+    }
+    public void OverrideDesktopOutput()
+    {
+        if (enableRecordingView && BasisDeviceManagement.IsUserInDesktop() == false)
+        {
+            captureCamera.targetTexture = null;
+            captureCamera.depth = 1;
+            captureCamera.targetDisplay = 0;
+            FillRenderTextureWithColor(renderTexture, Color.black);
+        }
+        else
+        {
+            captureCamera.depth = -1;
+            captureCamera.targetDisplay = 1;
+            captureCamera.targetTexture = renderTexture;
+        }
+    }
+    public void OnOverrideDesktopOutputButtonPress()
+    {
+        enableRecordingView = !enableRecordingView;
+        OverrideDesktopOutput();
+    }
+    void FillRenderTextureWithColor(RenderTexture rt, Color color)
+    {
+        // Save current active RenderTexture
+        RenderTexture previous = RenderTexture.active;
+
+        // Set our target as the active RenderTexture
+        RenderTexture.active = rt;
+
+        // Set up viewport and projection
+        GL.PushMatrix();
+        GL.LoadPixelMatrix(0, rt.width, rt.height, 0);
+
+        // Clear with the target color
+        GL.Clear(true, true, color);
+
+        // Clean up
+        GL.PopMatrix();
+
+        // Restore previous RT
+        RenderTexture.active = previous;
     }
     public void Nameplates()
     {
