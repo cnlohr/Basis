@@ -297,18 +297,27 @@ public static class BasisBundleBuild
     // Convert a Unity path to a Windows-compatible path and open it in File Explorer
     public static void OpenFolderInExplorer(string folderPath)
     {
+#if UNITY_EDITOR_LINUX
+        string osPath = folderPath;
+#else
         // Convert Unity-style file path (forward slashes) to Windows-style (backslashes)
-        string windowsPath = folderPath.Replace("/", "\\");
+        string osPath = folderPath.Replace("/", "\\");
+#endif
 
         // Check if the path exists
-        if (Directory.Exists(windowsPath) || File.Exists(windowsPath))
+        if (Directory.Exists(osPath) || File.Exists(osPath))
         {
+#if UNITY_EDITOR_LINUX
             // On Windows, use 'explorer' to open the folder or highlight the file
-            System.Diagnostics.Process.Start("explorer.exe", windowsPath);
+            System.Diagnostics.Process.Start("open", osPath);
+#else
+            // On Windows, use 'explorer' to open the folder or highlight the file
+            System.Diagnostics.Process.Start("explorer.exe", osPath);
+#endif
         }
         else
         {
-            Debug.LogError("Path does not exist: " + windowsPath);
+            Debug.LogError("Path does not exist: " + osPath);
         }
     }
     public static bool ErrorChecking(BasisContentBase BasisContentBase, out string Error)
