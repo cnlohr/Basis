@@ -1,5 +1,6 @@
 using Basis.Network.Core;
 using BasisNetworkCore;
+using LiteNetLib;
 using LiteNetLib.Utils;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -29,11 +30,11 @@ public static class BasisNetworkResourceManagement
 
                 NetDataWriter writer = new NetDataWriter(true);
                 unloadResource.Serialize(writer);
-
+                NetPeer[] peers = NetworkServer.AuthenticatedPeers.Values.ToArray();
                 NetworkServer.BroadcastMessageToClients(
                     writer,
-                    BasisNetworkCommons.LoadResourceMessage,
-                    BasisPlayerArray.GetSnapshot(),
+                    BasisNetworkCommons.LoadResourceChannel,
+                    peers,
                     LiteNetLib.DeliveryMethod.ReliableSequenced
                 );
 
@@ -53,7 +54,7 @@ public static class BasisNetworkResourceManagement
                 LocalLoadResource LLR = Resource[Index];
                 NetDataWriter Writer = new NetDataWriter(true);
                 LLR.Serialize(Writer);
-                NetworkServer.SendOutValidated(NewConnection, Writer, BasisNetworkCommons.LoadResourceMessage, LiteNetLib.DeliveryMethod.ReliableOrdered);
+                NetworkServer.TrySend(NewConnection, Writer, BasisNetworkCommons.LoadResourceChannel, LiteNetLib.DeliveryMethod.ReliableOrdered);
             }
         }
     }
@@ -66,8 +67,8 @@ public static class BasisNetworkResourceManagement
             if (UshortNetworkDatabase.TryAdd(LocalLoadResource.LoadedNetID, LocalLoadResource))
             {
                 BNL.Log("Adding Object " + LocalLoadResource.LoadedNetID);
-
-                NetworkServer.BroadcastMessageToClients(Writer, BasisNetworkCommons.LoadResourceMessage, BasisPlayerArray.GetSnapshot(), LiteNetLib.DeliveryMethod.ReliableSequenced);
+                NetPeer[] peers = NetworkServer.AuthenticatedPeers.Values.ToArray();
+                NetworkServer.BroadcastMessageToClients(Writer, BasisNetworkCommons.LoadResourceChannel, peers, LiteNetLib.DeliveryMethod.ReliableOrdered);
             }
             else
             {
@@ -86,7 +87,8 @@ public static class BasisNetworkResourceManagement
             NetDataWriter Writer = new NetDataWriter(true);
             UnLoadResource.Serialize(Writer);
             BNL.Log("Removing Object " + UnLoadResource.LoadedNetID);
-            NetworkServer.BroadcastMessageToClients(Writer, BasisNetworkCommons.UnloadResourceMessage, BasisPlayerArray.GetSnapshot(), LiteNetLib.DeliveryMethod.ReliableSequenced);
+            NetPeer[] peers = NetworkServer.AuthenticatedPeers.Values.ToArray();
+            NetworkServer.BroadcastMessageToClients(Writer, BasisNetworkCommons.UnloadResourceChannel, peers, LiteNetLib.DeliveryMethod.ReliableOrdered);
         }
         else
         {

@@ -3,10 +3,10 @@ using System.Threading;
 
 namespace LiteNetLib
 {
-    public abstract class BaseChannel
+    internal abstract class BaseChannel
     {
         protected readonly NetPeer Peer;
-        public Queue<NetPacket> OutgoingQueue = new Queue<NetPacket>(NetConstants.DefaultWindowSize);
+        protected readonly Queue<NetPacket> OutgoingQueue = new Queue<NetPacket>(NetConstants.DefaultWindowSize);
         private int _isAddedToPeerChannelSendQueue;
 
         public int PacketsInQueue => OutgoingQueue.Count;

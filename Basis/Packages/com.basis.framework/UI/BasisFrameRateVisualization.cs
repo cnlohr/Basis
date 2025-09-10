@@ -14,15 +14,15 @@ public class BasisFrameRateVisualization : MonoBehaviour
 
     void Update()
     {
+        float Unscaled = Time.unscaledDeltaTime;
         // Calculate the time it took to render the last frame
-        deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
+        deltaTime += (Unscaled - deltaTime) * 0.1f;
 
         // Calculate FPS based on deltaTime
         fps = 1.0f / deltaTime;
 
         // Accumulate time
-        timeAccumulator += Time.unscaledDeltaTime;
-
+        timeAccumulator += Unscaled;
         // If the accumulated time exceeds the update interval, update the FPS display
         if (timeAccumulator >= timeBetweenUpdates)
         {
@@ -31,16 +31,15 @@ public class BasisFrameRateVisualization : MonoBehaviour
             stringBuilder.Append("FPS: ");
             stringBuilder.Append(fps.ToString("F2"));
 
-            if (BasisNetworkManagement.LocalPlayerPeer != null)
+            if (BasisNetworkConnection.LocalPlayerPeer != null)
             {
                 stringBuilder.Append(" RTT: ");
-                stringBuilder.Append(BasisNetworkManagement.LocalPlayerPeer.RoundTripTime);
+                stringBuilder.Append(BasisNetworkConnection.LocalPlayerPeer.RoundTripTime);
                 stringBuilder.Append(" STT: ");
-                stringBuilder.Append(BasisNetworkManagement.LocalPlayerPeer.Ping);
+                stringBuilder.Append(BasisNetworkConnection.LocalPlayerPeer.Ping);
                 stringBuilder.Append(" CCU: ");
-                stringBuilder.Append(BasisNetworkManagement.ReceiverCount +1);
+                stringBuilder.Append(BasisNetworkPlayers.ReceiverCount +1);
             }
-
             // Update the TextMeshProUGUI text
             fpsText.text = stringBuilder.ToString();
 

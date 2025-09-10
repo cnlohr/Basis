@@ -1,4 +1,5 @@
-﻿using LiteNetLib.Utils;
+using BasisNetworkCore.Pooling;
+using LiteNetLib.Utils;
 using System;
 
 public static partial class SerializableBasis
@@ -8,29 +9,45 @@ public static partial class SerializableBasis
         public ushort messageIndex;
         public byte[] payload;
 
-        public void Deserialize(NetDataReader Writer)
+        public void Deserialize(NetDataReader reader)
         {
             // Read the messageIndex safely
-            if (!Writer.TryGetUShort(out messageIndex))
+            if (!reader.TryGetUShort(out messageIndex))
             {
                 throw new ArgumentException("Failed to read messageIndex.");
             }
 
-            // Read remaining bytes as payload
-            if (Writer.AvailableBytes > 0)
+            int payloadSize = reader.AvailableBytes;
+
+            if (payloadSize > 0)
             {
-                payload = Writer.GetRemainingBytes();
+                // Return previous payload to the pool if needed
+                if (payload != null)
+                {
+                    BasisByteArrayPooling.Return(payload);
+                }
+
+                payload = BasisByteArrayPooling.Rent(payloadSize);
+                reader.GetBytes(payload, payloadSize);
             }
         }
 
-        public void Serialize(NetDataWriter Writer)
+        public void Serialize(NetDataWriter writer)
         {
-            // Write the messageIndex
-            Writer.Put(messageIndex);
-            // Write the payload if present
+            writer.Put(messageIndex);
+
             if (payload != null && payload.Length > 0)
             {
-                Writer.Put(payload);
+                writer.Put(payload);
+            }
+        }
+
+        public void Release()
+        {
+            if (payload != null)
+            {
+                BasisByteArrayPooling.Return(payload);
+                payload = null;
             }
         }
     }

@@ -15,14 +15,16 @@ public class BasisAvatarValidator
     private Label warningMessageLabel;
     private VisualElement passedPanel;
     private Label passedMessageLabel;
-
-    public BasisAvatarValidator(BasisAvatar avatar, VisualElement Root)
+    public const int MaxTrianglesBeforeWarning = 150000;
+    public const int MeshVertices = 65535;
+    public VisualElement Root;
+    public BasisAvatarValidator(BasisAvatar avatar, VisualElement root)
     {
         Avatar = avatar;
-
-        CreateErrorPanel(Root);
-        CreateWarningPanel(Root);
-        CreatePassedPanel(Root);
+        Root = root;
+        CreateErrorPanel(root);
+        CreateWarningPanel(root);
+        CreatePassedPanel(root);
         EditorApplication.update += UpdateValidation; // Run per frame
     }
 
@@ -33,18 +35,19 @@ public class BasisAvatarValidator
 
     private void UpdateValidation()
     {
-        if (ValidateAvatar(out List<string> errors, out List<string> warnings, out List<string> passes))
+        CheckTranslation(Avatar);
+        if (ValidateAvatar(out List<BasisValidationIssue> errors, out List<BasisValidationIssue> warnings, out List<string> passes))
         {
             HideErrorPanel();
         }
         else
         {
-            ShowErrorPanel(errors);
+            ShowErrorPanel(Root,errors);
         }
 
         if (warnings.Count > 0)
         {
-            ShowWarningPanel(warnings);
+            ShowWarningPanel(Root, warnings);
         }
         else
         {
@@ -144,21 +147,71 @@ public class BasisAvatarValidator
         passedPanel.style.display = DisplayStyle.None;
         rootElement.Add(passedPanel);
     }
-
-    public bool ValidateAvatar(out List<string> errors, out List<string> warnings, out List<string> passes)
+    public class BasisValidationIssue
     {
-        errors = new List<string>();
-        warnings = new List<string>();
+        public string Message { get; }
+        public Action Fix { get; }
+        public BasisValidationIssue(string message, Action fix = null)
+        {
+            Message = message;
+            Fix = fix;
+        }
+    }
+    private static void RemoveMissingScripts(GameObject MissingScriptParent)
+    {
+        int removedCount = 0;
+        BasisDebug.Log("Evaluating RemoveMissingScripts");
+        Transform[] children = MissingScriptParent.GetComponentsInChildren<Transform>(true);
+        foreach (Transform child in children)
+        {
+            int count = GameObjectUtility.RemoveMonoBehavioursWithMissingScript(child.gameObject);
+            if (count > 0)
+            {
+                BasisDebug.LogWarning($"Removed {count} missing script(s) from GameObject: {child.name}", BasisDebug.LogTag.Editor);
+                removedCount += count;
+
+                // Mark the object as dirty so Unity knows it was changed
+                EditorUtility.SetDirty(child.gameObject);
+            }
+        }
+        BasisDebug.Log($"Removed a total of {removedCount} missing scripts.", BasisDebug.LogTag.Editor);
+    }
+    public bool ValidateAvatar(out List<BasisValidationIssue> errors,out List<BasisValidationIssue> warnings, out List<string> passes)
+    {
+        errors = new List<BasisValidationIssue>();
+        warnings = new List<BasisValidationIssue>();
         passes = new List<string>();
 
         if (Avatar == null)
         {
-            errors.Add("Avatar is missing.");
+            errors.Add(new BasisValidationIssue("Avatar is missing.",null));
             return false;
         }
         else
         {
             passes.Add("Avatar is assigned.");
+        }
+
+        int missingCount = 0;
+        Component[] components = Avatar.GetComponentsInChildren<Component>(true);
+        for (int Index = 0; Index < components.Length; Index++)
+        {
+            if (components[Index] == null)
+            {
+                missingCount++;
+            }
+        }
+        if (missingCount == 0)
+        {
+            passes.Add("No missing scripts found in the scene.");
+        }
+        else
+        {
+            void action()
+            {
+                RemoveMissingScripts(Avatar.gameObject);
+            }
+            warnings.Add(new BasisValidationIssue( $"Press to remove missing scripts automatically", action));
         }
 
         if (Avatar.Animator != null)
@@ -167,16 +220,16 @@ public class BasisAvatarValidator
 
             if(Avatar.Animator.runtimeAnimatorController  != null)
             {
-                warnings.Add("Animator Controller Exists, please check that it supports basis before usage");
+                warnings.Add(new BasisValidationIssue("Animator Controller Exists, please check that it supports basis before usage", null));
             }
             if (Avatar.Animator.avatar == null)
             {
-                errors.Add("Animator Exists but has not Avatar! please check import settings!");
+                errors.Add(new BasisValidationIssue("Animator Exists but has not Avatar! please check import settings!", null));
             }
         }
         else
         {
-            errors.Add("Animator is missing.");
+            errors.Add(new BasisValidationIssue("Animator is missing.", null));
         }
 
         if (Avatar.BlinkViseme != null && Avatar.BlinkViseme.Length > 0)
@@ -185,7 +238,7 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("BlinkViseme Meta Data is missing.");
+            errors.Add(new BasisValidationIssue("BlinkViseme Meta Data is missing.", null));
         }
 
         if (Avatar.FaceVisemeMovement != null && Avatar.FaceVisemeMovement.Length > 0)
@@ -194,7 +247,7 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("FaceVisemeMovement Meta Data is missing.");
+            errors.Add(new BasisValidationIssue("FaceVisemeMovement Meta Data is missing.", null));
         }
 
         if (Avatar.FaceBlinkMesh != null)
@@ -203,7 +256,7 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("FaceBlinkMesh is missing. Assign a skinned mesh.");
+            errors.Add(new BasisValidationIssue("FaceBlinkMesh is missing. Assign a skinned mesh.", null));
         }
 
         if (Avatar.FaceVisemeMesh != null)
@@ -212,7 +265,7 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("FaceVisemeMesh is missing. Assign a skinned mesh.");
+            errors.Add(new BasisValidationIssue("FaceVisemeMesh is missing. Assign a skinned mesh.", null));
         }
 
         if (Avatar.AvatarEyePosition != Vector2.zero)
@@ -221,7 +274,7 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("Avatar Eye Position is not set.");
+            errors.Add(new BasisValidationIssue("Avatar Eye Position is not set.", null));
         }
 
         if (Avatar.AvatarMouthPosition != Vector2.zero)
@@ -230,20 +283,20 @@ public class BasisAvatarValidator
         }
         else
         {
-            errors.Add("Avatar Mouth Position is not set.");
+            errors.Add(new BasisValidationIssue("Avatar Mouth Position is not set.", null));
         }
         if (string.IsNullOrEmpty(Avatar.BasisBundleDescription.AssetBundleName))
         {
-            errors.Add("Avatar Name Is Empty.");
+            errors.Add(new BasisValidationIssue("Avatar Name Is Empty.", null));
         }
 
         if (string.IsNullOrEmpty(Avatar.BasisBundleDescription.AssetBundleDescription))
         {
-            warnings.Add("Avatar Description Is empty");
+            warnings.Add(new BasisValidationIssue("Avatar Description Is empty", null));
         }
         if (ReportIfNoIll2CPP())
         {
-            warnings.Add("IL2CPP Is Potentially Missing, Check Unity Hub, Normally needed is Linux,Windows,Android Ill2CPP");
+            warnings.Add(new BasisValidationIssue("IL2CPP Is Potentially Missing, Check Unity Hub, Normally needed is Linux,Windows,Android Ill2CPP", null));
         }
         Renderer[] renderers = Avatar.GetComponentsInChildren<Renderer>();
         SkinnedMeshRenderer[] SMRS = Avatar.GetComponentsInChildren<SkinnedMeshRenderer>();
@@ -255,44 +308,6 @@ public class BasisAvatarValidator
         {
             CheckMesh(SMR, ref errors,ref warnings);
 
-        }
-        if (Avatar.JiggleStrains != null && Avatar.JiggleStrains.Length != 0)
-        {
-            for (int JiggleStrainIndex = 0; JiggleStrainIndex < Avatar.JiggleStrains.Length; JiggleStrainIndex++)
-            {
-                BasisJiggleStrain Strain = Avatar.JiggleStrains[JiggleStrainIndex];
-                if (Strain != null)
-                {
-                    if (Strain.IgnoredTransforms != null && Strain.IgnoredTransforms.Length != 0)
-                    {
-                        for (int Index = 0; Index < Strain.IgnoredTransforms.Length; Index++)
-                        {
-                            if (Strain.IgnoredTransforms[Index] == null)
-                            {
-                                errors.Add("Avatar Ignored Transform is Missing");
-                            }
-                        }
-                    }
-                    if (Strain.RootTransform == null)
-                    {
-                        errors.Add("RootTransform of Jiggle is missing!");
-                    }
-                    if (Strain.Colliders != null && Strain.Colliders.Length != 0)
-                    {
-                        for (int Index = 0; Index < Strain.Colliders.Length; Index++)
-                        {
-                            if (Strain.Colliders[Index] == null)
-                            {
-                                errors.Add("Avatar Jiggle Collider Is Missing!");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    errors.Add("Avatar.JiggleStrains Has a Empty Strain!! at index " + JiggleStrainIndex);
-                }
-            }
         }
         Transform[] transforms = Avatar.GetComponentsInChildren<Transform>();
         Dictionary<string, int> nameCounts = new Dictionary<string, int>();
@@ -313,12 +328,60 @@ public class BasisAvatarValidator
         {
             if (entry.Value > 1)
             {
-                errors.Add($"Duplicate name found: {entry.Key} ({entry.Value} times)");
+                errors.Add(new BasisValidationIssue($"Duplicate name found: {entry.Key} ({entry.Value} times)", null));
             }
         }
         return errors.Count == 0;
     }
-    public void CheckTextures(Renderer Renderer,ref List<string> warnings)
+    /// <summary>
+    /// Enables Translation DoF (HumanDescription.hasTranslationDoF = true) on the source model that a prefab comes from.
+    /// - Accepts either a prefab asset (Project window) or a prefab instance (in the Scene/Hierarchy).
+    /// - Only affects Humanoid rigs. (Optionally, set forceHumanoid = true to switch the importer to Humanoid.)
+    /// Returns true if the setting was applied or already enabled. Returns false if not applicable.
+    /// </summary>
+    /// <param name="prefab">Prefab asset or prefab instance GameObject.</param>
+    /// <param name="forceHumanoid">If true and the importer isn't Humanoid, switch it to Humanoid before applying.</param>
+    public static void CheckTranslation(BasisAvatar Avatar)
+    {
+        foreach (Renderer renderer in Avatar.Renders)
+        {
+            // Only process SkinnedMeshRenderer
+            if (renderer is SkinnedMeshRenderer skinnedRenderer && skinnedRenderer.sharedMesh != null)
+            {
+                string filePath = AssetDatabase.GetAssetOrScenePath(skinnedRenderer.sharedMesh);
+
+                // The Translation DoF toggle lives on the ModelImporter (the .fbx/.model that produced this prefab)
+                var modelImporter = AssetImporter.GetAtPath(filePath) as ModelImporter;
+                if (modelImporter == null)
+                {
+                    continue;
+                }
+
+                // Read/modify/write the human description
+                var hd = modelImporter.humanDescription;
+                if (hd.hasTranslationDoF == false)
+                {
+                    // Already enabled
+                    continue;
+                }
+
+                hd.hasTranslationDoF = false;
+                modelImporter.humanDescription = hd;
+
+                // Apply by reimporting the asset
+                try
+                {
+                    modelImporter.SaveAndReimport();
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[EnableTranslationDofForPrefab] Reimport failed for '{skinnedRenderer}': {e.Message}");
+                }
+            }
+
+        }
+    }
+    public void CheckTextures(Renderer Renderer,ref List<BasisValidationIssue> warnings)
     {
         // Check for texture streaming
         List<Texture> texturesToCheck = new List<Texture>();
@@ -330,12 +393,12 @@ public class BasisAvatarValidator
             }
 
             Shader shader = mat.shader;
-            int propertyCount = ShaderUtil.GetPropertyCount(shader);
+            int propertyCount = shader.GetPropertyCount();
             for (int Index = 0; Index < propertyCount; Index++)
             {
-                if (ShaderUtil.GetPropertyType(shader, Index) == ShaderUtil.ShaderPropertyType.TexEnv)
+                if (shader.GetPropertyType(Index) ==  UnityEngine.Rendering.ShaderPropertyType.Texture)
                 {
-                    string propName = ShaderUtil.GetPropertyName(shader, Index);
+                    string propName = shader.GetPropertyName(Index);
                     if (mat.HasProperty(propName))
                     {
                         Texture tex = mat.GetTexture(propName);
@@ -358,32 +421,30 @@ public class BasisAvatarValidator
                 {
                     if (!texImporter.streamingMipmaps)
                     {
-                        warnings.Add($"Texture \"{tex.name}\" does not have Streaming Mip Maps enabled. this will effect negatively its performance ranking");
+                        warnings.Add(new BasisValidationIssue($"Texture \"{tex.name}\" does not have Streaming Mip Maps enabled. this will effect negatively its performance ranking",null));
                     }
                     if(texImporter.maxTextureSize > 4096)
                     {
-                        warnings.Add($"Texture \"{tex.name}\" is {texImporter.maxTextureSize} this will impact performance negatively");
+                        warnings.Add(new BasisValidationIssue($"Texture \"{tex.name}\" is {texImporter.maxTextureSize} this will impact performance negatively", null));
                     }
                 }
             }
         }
     }
-    public const int MaxTrianglesBeforeWarning = 150000;
-    public const int MeshVertices = 65535;
-    public void CheckMesh(SkinnedMeshRenderer skinnedMeshRenderer, ref List<string> Errors, ref List<string> Warnings)
+    public void CheckMesh(SkinnedMeshRenderer skinnedMeshRenderer, ref List<BasisValidationIssue> Errors, ref List<BasisValidationIssue> Warnings)
     {
         if (skinnedMeshRenderer.sharedMesh == null)
         {
-            Errors.Add($"{skinnedMeshRenderer.gameObject.name} does not have a mesh assigned to its SkinnedMeshRenderer!");
+            Errors.Add(new BasisValidationIssue($"{skinnedMeshRenderer.gameObject.name} does not have a mesh assigned to its SkinnedMeshRenderer!", null));
             return;
         }
         if (skinnedMeshRenderer.sharedMesh.triangles.Length > MaxTrianglesBeforeWarning)
         {
-            Warnings.Add($"{skinnedMeshRenderer.gameObject.name} Has More then {MaxTrianglesBeforeWarning} Triangles. This will cause performance issues");
+            Warnings.Add(new BasisValidationIssue($"{skinnedMeshRenderer.gameObject.name} Has More then {MaxTrianglesBeforeWarning} Triangles. This will cause performance issues", null));
         }
         if (skinnedMeshRenderer.sharedMesh.vertices.Length > MeshVertices)
         {
-            Warnings.Add($"{skinnedMeshRenderer.gameObject.name} Has more vertices then what can be properly renderer ({MeshVertices}). this will cause performance issues");
+            Warnings.Add(new BasisValidationIssue($"{skinnedMeshRenderer.gameObject.name} Has more vertices then what can be properly renderer ({MeshVertices}). this will cause performance issues", null));
         }
         if (skinnedMeshRenderer.sharedMesh.blendShapeCount != 0)
         {
@@ -393,13 +454,13 @@ public class BasisAvatarValidator
                 ModelImporter modelImporter = AssetImporter.GetAtPath(assetPath) as ModelImporter;
                 if (modelImporter != null && !ModelImporterExtensions.IsLegacyBlendShapeNormalsEnabled(modelImporter))
                 {
-                    Warnings.Add($"{assetPath} does not have legacy blendshapes enabled, which may increase file size.");
+                    Warnings.Add(new BasisValidationIssue($"{assetPath} does not have legacy blendshapes enabled, which may increase file size.", null));
                 }
             }
         }
         if (skinnedMeshRenderer.allowOcclusionWhenDynamic == false)
         {
-            Errors.Add("Avatar has Dynamic Occlusion disabled on Skinned Mesh Renderer " + skinnedMeshRenderer.gameObject.name);
+            Errors.Add(new BasisValidationIssue("Avatar has Dynamic Occlusion disabled on Skinned Mesh Renderer " + skinnedMeshRenderer.gameObject.name, null));
         }
     }
     public static bool ReportIfNoIll2CPP()
@@ -412,19 +473,114 @@ public class BasisAvatarValidator
         bool il2cppExists = Directory.Exists(il2cppPath);
         return !il2cppExists;
     }
-    private void ShowErrorPanel(List<string> errors)
+    private void ShowErrorPanel(VisualElement Root, List<BasisValidationIssue> errors)
     {
-        errorMessageLabel.text = string.Join("\n", errors);
+        string IssueList = string.Empty;
+        for (int Index = 0; Index < errors.Count; Index++)
+        {
+            BasisValidationIssue issue = errors[Index];
+            Action ActFix = issue.Fix;
+            if (ActFix != null)
+            {
+                AutoFixButton(Root, ActFix, issue.Message);
+            }
+            IssueList += issue.Message;
+        }
+        errorMessageLabel.text = string.Join("\n", IssueList);
         errorPanel.style.display = DisplayStyle.Flex;
     }
     private void HideErrorPanel()
     {
         errorPanel.style.display = DisplayStyle.None;
     }
-    private void ShowWarningPanel(List<string> warnings)
+    private void ShowWarningPanel(VisualElement Root,List<BasisValidationIssue> warnings)
     {
-        warningMessageLabel.text = string.Join("\n", warnings);
+        string warningsList = string.Empty;
+        for (int Index = 0; Index < warnings.Count; Index++)
+        {
+            BasisValidationIssue issue = warnings[Index];
+            Action ActFix = issue.Fix;
+            if (ActFix != null)
+            {
+                AutoFixButton(Root, ActFix, issue.Message);
+            }
+            warningsList += issue.Message;
+        }
+        warningMessageLabel.text = string.Join("\n", warningsList);
         warningPanel.style.display = DisplayStyle.Flex;
+    }
+    public void ClearFixButtons(VisualElement rootElement)
+    {
+        int FixMeButtonsCount = FixMeButtons.Count;
+        for (int Index = 0; Index < FixMeButtonsCount; Index++)
+        {
+            rootElement.Remove(FixMeButtons[Index]);    
+        }
+        FixMeButtons.Clear();
+    }
+    public List<Button> FixMeButtons = new List<Button>();
+    public void AutoFixButton(VisualElement rootElement, Action onClickAction, string fixMe)
+    {
+        foreach(Button button in FixMeButtons)
+        {
+            if(button.text == fixMe)
+            {
+                return;
+            }
+        }
+        // Create the button
+        Button fixMeButton = new Button();
+
+        fixMeButton.clicked += delegate
+        {
+            onClickAction.Invoke();
+            ClearFixButtons(Root);
+        };
+
+        fixMeButton.text = fixMe; // Icon + Text
+
+        // Modern slick style
+        fixMeButton.style.backgroundColor = new StyleColor(new Color(0.5f, 0.5f, 0.5f, 1f)); // Material Red 500
+        fixMeButton.style.color = new StyleColor(Color.white);
+        fixMeButton.style.fontSize = 14;
+        fixMeButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+        // Padding and margin
+        fixMeButton.style.paddingTop = 6;
+        fixMeButton.style.paddingBottom = 6;
+        fixMeButton.style.paddingLeft = 12;
+        fixMeButton.style.paddingRight = 12;
+        fixMeButton.style.marginBottom = 10;
+
+        // Rounded corners
+        fixMeButton.style.borderTopLeftRadius = 8;
+        fixMeButton.style.borderTopRightRadius = 8;
+        fixMeButton.style.borderBottomLeftRadius = 8;
+        fixMeButton.style.borderBottomRightRadius = 8;
+
+        // Border and shadow
+        fixMeButton.style.borderLeftWidth = 0;
+        fixMeButton.style.borderRightWidth = 0;
+        fixMeButton.style.borderTopWidth = 0;
+        fixMeButton.style.borderBottomWidth = 3;
+
+        // Shadow-like effect via unityBackgroundImageTintColor or using USS later
+        fixMeButton.style.unityTextAlign = TextAnchor.MiddleCenter;
+        fixMeButton.style.alignSelf = Align.Auto;
+
+        // Hover effect via C# events (UI Toolkit lacks hover pseudoclass in C# directly)
+        fixMeButton.RegisterCallback<MouseEnterEvent>(evt =>
+        {
+            fixMeButton.style.backgroundColor = new StyleColor(new Color(0.9f, 0.2f, 0.2f));
+        });
+        fixMeButton.RegisterCallback<MouseLeaveEvent>(evt =>
+        {
+            fixMeButton.style.backgroundColor = new StyleColor(new Color(0.96f, 0.26f, 0.21f));
+        });
+
+        // Add to root and store
+        rootElement.Add(fixMeButton);
+        FixMeButtons.Add(fixMeButton);
     }
     private void HideWarningPanel()
     {

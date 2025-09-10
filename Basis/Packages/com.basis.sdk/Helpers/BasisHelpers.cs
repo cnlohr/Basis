@@ -48,15 +48,54 @@ namespace Basis.Scripts.BasisSdk.Helpers
             boneTransform = animator.GetBoneTransform(bone);
             return boneTransform != null;
         }
-
-        public static Vector3 ConvertToLocalSpace(float3 notFloorPosition, float3 floorPosition)
+        /// <summary>
+        /// Local → World: world = origin + rotation * local
+        /// </summary>
+        public static Vector3 ConvertFromLocalSpace(Vector3 localPosition, Vector3 origin, Quaternion rotation)
         {
+            return origin + rotation * localPosition;
+        }
+
+        /// <summary>
+        /// World → Local: local = inverse(rotation) * (world - origin)
+        /// </summary>
+        public static Vector3 ConvertToLocalSpace(Vector3 worldPosition, Vector3 origin, Quaternion rotation)
+        {
+            return Quaternion.Inverse(rotation) * (worldPosition - origin);
+        }
+
+        // --- LEGACY SIGNATURES (if something else calls these) -------------------
+        // If other code still calls the old methods (without rotation), they will behave
+        // like your original “no-rotation” logic. Prefer using the rotation-aware ones.
+
+        public static Vector3 ConvertFromLocalSpace(Vector3 notFloorPosition, Vector3 floorPosition)
+        {
+            // original behavior: translation only
+            return notFloorPosition + floorPosition;
+        }
+
+        public static Vector3 ConvertToLocalSpace(Vector3 notFloorPosition, Vector3 floorPosition)
+        {
+            // original behavior: translation only
             return notFloorPosition - floorPosition;
         }
 
-        public static Vector3 ConvertFromLocalSpace(float3 notFloorPosition, float3 floorPosition)
+        // --- 2D/3D AVATAR POSITION MAPPINGS --------------------------------------
+
+        /// <summary>
+        /// Map (y,z) -> (x=0, y, z) for use in 3D local/world math
+        /// </summary>
+        public static Vector3 AvatarPositionConversion(Vector2 input)
         {
-            return notFloorPosition + floorPosition;
+            return new Vector3(0f, input.x, input.y);
+        }
+
+        /// <summary>
+        /// Map (x=ignored, y, z) -> (y,z)
+        /// </summary>
+        public static Vector2 AvatarPositionConversion(Vector3 input)
+        {
+            return new Vector2(input.y, input.z);
         }
         public static bool TryGetVector3Bone(Animator animator, HumanBodyBones bone, out Vector3 position)
         {
@@ -77,43 +116,6 @@ namespace Basis.Scripts.BasisSdk.Helpers
             position = Vector3.zero;
             return false;
         }
-
-        public static Vector3 AvatarPositionConversion(Vector2 input)
-        {
-            return new Vector3(0, input.x, input.y);
-        }
-
-        public static Vector2 AvatarPositionConversion(Vector3 input)
-        {
-            return new Vector2(input.y, input.z);
-        }
-        public static void CalculateReflectionMatrix(ref Matrix4x4 reflectionMat, Vector4 plane)
-        {
-            reflectionMat.m00 = (1F - 2F * plane[0] * plane[0]);
-            reflectionMat.m01 = (-2F * plane[0] * plane[1]);
-            reflectionMat.m02 = (-2F * plane[0] * plane[2]);
-            reflectionMat.m03 = (-2F * plane[3] * plane[0]);
-
-            reflectionMat.m10 = (-2F * plane[1] * plane[0]);
-            reflectionMat.m11 = (1F - 2F * plane[1] * plane[1]);
-            reflectionMat.m12 = (-2F * plane[1] * plane[2]);
-            reflectionMat.m13 = (-2F * plane[3] * plane[1]);
-
-            reflectionMat.m20 = (-2F * plane[2] * plane[0]);
-            reflectionMat.m21 = (-2F * plane[2] * plane[1]);
-            reflectionMat.m22 = (1F - 2F * plane[2] * plane[2]);
-            reflectionMat.m23 = (-2F * plane[3] * plane[2]);
-
-            reflectionMat.m30 = 0F;
-            reflectionMat.m31 = 0F;
-            reflectionMat.m32 = 0F;
-            reflectionMat.m33 = 1F;
-        }
-        /// <summary>
-        /// Optimized sign function using built-in math
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float sgn(float a) => Mathf.Sign(a);
 
         /// <summary>
         /// Calculates camera-space plane from a world-space plane

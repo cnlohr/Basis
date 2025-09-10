@@ -1,8 +1,8 @@
-
 using Basis.Network.Core;
 using Basis.Network.Server;
 using Basis.Network.Server.Auth;
 using BasisDidLink;
+using BasisNetworkServer.BasisNetworkingReductionSystem;
 using BasisNetworkServer.Security;
 using BasisServerHandle;
 using LiteNetLib;
@@ -10,38 +10,63 @@ using LiteNetLib.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+
 public static class NetworkServer
 {
-    public static EventBasedNetListener listener;
-    public static NetManager server;
-    public static ConcurrentDictionary<ushort, NetPeer> Peers = new ConcurrentDictionary<ushort, NetPeer>();
-    public static StripedNetPeerArray chunkedNetPeerArray = new StripedNetPeerArray();
+    public static EventBasedNetListener Listener;
+    public static NetManager Server;
+    public static ConcurrentDictionary<ushort, NetPeer> AuthenticatedPeers = new();
     public static Configuration Configuration;
-    public static IAuth auth;
-    public static IAuthIdentity authIdentity;
+    public static IAuth Auth;
+    public static IAuthIdentity AuthIdentity;
+    #region Server Entry Point
+
     public static void StartServer(Configuration configuration)
     {
         Configuration = configuration;
-        BasisServerReductionSystem.Configuration = configuration;
-        BasisPlayerModeration.UseFileOnDisc = configuration.HasFileSupport;
-        IAuthIdentity.HasFileSupport = configuration.HasFileSupport;
-        auth = new PasswordAuth(configuration.Password ?? string.Empty);
-        authIdentity = new BasisDIDAuthIdentity();
+
+        InitializePulseSettings();
+        InitializeAuth();
         SetupServer(configuration);
+        SubscribeEvents();
+
+        if (configuration.EnableStatistics)
+            BasisStatistics.StartWorkerThread(Server);
+
+        BNL.Log("Server Worker Threads Booted");
+    }
+
+    private static void InitializePulseSettings()
+    {
+        BasisServerReductionSystemEvents.BSRBaseMultiplier = Configuration.BSRBaseMultiplier;
+        BasisServerReductionSystemEvents.BSRSMillisecondDefaultInterval = Configuration.BSRSMillisecondDefaultInterval;
+        BasisServerReductionSystemEvents.BSRSIncreaseRate = Configuration.BSRSIncreaseRate;
+    }
+
+    private static void InitializeAuth()
+    {
+        BasisPlayerModeration.UseFileOnDisc = Configuration.HasFileSupport;
+        IAuthIdentity.HasFileSupport = Configuration.HasFileSupport;
+
+        Auth = new PasswordAuth(Configuration.Password ?? string.Empty);
+        AuthIdentity = new BasisDIDAuthIdentity();
+    }
+
+    private static void SubscribeEvents()
+    {
         BasisServerHandleEvents.SubscribeServerEvents();
         BasisPlayerModeration.LoadBannedPlayers();
-        if (configuration.EnableStatistics)
-        {
-            BasisStatistics.StartWorkerThread(NetworkServer.server);
-        }
-        BNL.Log("Server Worker Threads Booted");
-
     }
+
+    #endregion
+
     #region Server Setup
+
     public static void SetupServer(Configuration configuration)
     {
-        listener = new EventBasedNetListener();
-        server = new NetManager(listener)
+        Listener = new EventBasedNetListener();
+
+        Server = new NetManager(Listener)
         {
             AutoRecycle = false,
             UnconnectedMessagesEnabled = false,
@@ -55,121 +80,95 @@ public static class NetworkServer
             UpdateTime = BasisNetworkCommons.NetworkIntervalPoll,
             PingInterval = configuration.PingInterval,
             DisconnectTimeout = configuration.DisconnectTimeout,
-            PacketPoolSize = 2000,
             UnsyncedEvents = true,
-            ReceivePollingTime = 75000,
+            ReceivePollingTime = BasisNetworkCommons.ReceivePollingTime,
+            PacketPoolSize = BasisNetworkCommons.PacketPoolSize,
+            SimulateLatency = configuration.SimulateLatency,
+            SimulatePacketLoss = configuration.SimulatePacketLoss,
+            SimulationMaxLatency = configuration.SimulationMaxLatency,
+            SimulationMinLatency = configuration.SimulationMinLatency,
+            SimulationPacketLossChance = configuration.SimulationPacketLossChance,
+            MtuDiscovery = configuration.MtuDiscovery,
+            MtuOverride = configuration.MtuOverride
         };
+
         NetDebug.Logger = new BasisServerLogger();
         StartListening(configuration);
     }
-    public class BasisServerLogger : INetLogger
-    {
-        public void WriteNet(NetLogLevel level, string str, params object[] args)
-        {
-            switch (level)
-            {
-                case NetLogLevel.Warning:
-                    BNL.LogWarning(str);
-                    break;
-                case NetLogLevel.Error:
-                    BNL.LogError(str);
-                    break;
-                case NetLogLevel.Trace:
-                  //  BNL.Log(str);
-                    break;
-                case NetLogLevel.Info:
-                 //   BNL.Log(str);
-                    break;
-            }
-        }
-    }
+
     public static void StartListening(Configuration configuration)
     {
         if (configuration.OverrideAutoDiscoveryOfIpv)
         {
-            BNL.Log("Server Wiring up SetPort " + Configuration.SetPort + "IPv6Address " + Configuration.IPv6Address);
-            server.Start(Configuration.IPv4Address, Configuration.IPv6Address, Configuration.SetPort);
+            BNL.Log($"Server Wiring up SetPort {Configuration.SetPort} IPv6Address {Configuration.IPv6Address}");
+            Server.Start(Configuration.IPv4Address, Configuration.IPv6Address, Configuration.SetPort);
         }
         else
         {
-            BNL.Log("Server Wiring up SetPort " + Configuration.SetPort);
-            server.Start(Configuration.SetPort);
+            BNL.Log($"Server Wiring up SetPort {Configuration.SetPort}");
+            Server.Start(Configuration.SetPort);
         }
     }
+
     #endregion
-    public static void BroadcastMessageToClients(NetDataWriter Writer, byte channel, NetPeer sender, ReadOnlySpan<NetPeer> authenticatedClients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced)
+    public static void BroadcastMessageToClients(NetDataWriter writer, byte channel, NetPeer sender, ReadOnlySpan<NetPeer> clients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced, int maxMessages = 70)
     {
-        if (NetworkServer.CheckValidated(Writer))
+        if (!CheckValidated(writer)) return;
+
+        foreach (var client in clients)
         {
-            foreach (NetPeer client in authenticatedClients)
+            if (client.Id != sender.Id)
             {
-                if (client.Id != sender.Id)
-                {
-                    client.Send(Writer, channel, deliveryMethod);
-                }
+                TrySend(client, writer, channel, deliveryMethod, maxMessages);
             }
         }
     }
-    public static void BroadcastMessageToClients(NetDataWriter Writer, byte channel, ReadOnlySpan<NetPeer> authenticatedClients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced)
+    public static void BroadcastMessageToClients(NetDataWriter writer, byte channel, ReadOnlySpan<NetPeer> clients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced, int maxMessages = 70)
     {
-        if (NetworkServer.CheckValidated(Writer))
+        if (!CheckValidated(writer)) return;
+
+        foreach (var client in clients)
         {
-            int count = authenticatedClients.Length;
-            for (int index = 0; index < count; index++)
-            {
-                authenticatedClients[index].Send(Writer, channel, deliveryMethod);
-            }
+            TrySend(client, writer, channel, deliveryMethod, maxMessages);
         }
     }
-    public static void BroadcastMessageToClients(NetDataWriter Writer, byte channel, ref List<NetPeer> authenticatedClients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced, int MaxMessages = 70)
+
+    public static void BroadcastMessageToClients(NetDataWriter writer, byte channel, ref List<NetPeer> clients, DeliveryMethod deliveryMethod = DeliveryMethod.Sequenced, int maxMessages = 70)
     {
-        if (NetworkServer.CheckValidated(Writer))
+        if (!CheckValidated(writer)) return;
+
+        int count = clients.Count;
+        for (int Index = 0; Index < count; Index++)
         {
-            int count = authenticatedClients.Count;
-            if (deliveryMethod == DeliveryMethod.Sequenced)
+            NetPeer client = clients[Index];
+            TrySend(client, writer, channel, deliveryMethod, maxMessages);
+        }
+    }
+
+    public static void TrySend(NetPeer client, NetDataWriter writer, byte channel, DeliveryMethod deliveryMethod, int maxMessages = 70)
+    {
+        if (deliveryMethod == DeliveryMethod.Sequenced || deliveryMethod == DeliveryMethod.Unreliable)
+        {
+            int queuedMessages = client.GetPacketsCountInQueue(channel, deliveryMethod);
+            if (queuedMessages <= maxMessages)
             {
-                for (int index = 0; index < count; index++)
-                {
-                    int Size = authenticatedClients[index].GetPacketsCountInQueue(channel, deliveryMethod);
-                    if (Size <= MaxMessages)
-                    {
-                        authenticatedClients[index].Send(Writer, channel, deliveryMethod);
-                    }
-                }
+                client.Send(writer, channel, deliveryMethod);
             }
             else
             {
-                for (int index = 0; index < count; index++)
-                {
-                    authenticatedClients[index].Send(Writer, channel, deliveryMethod);
-                }
+               // BNL.LogError("Skipping send out of Channel " + channel);
             }
-        }
-    }
-    public static void SendOutValidated(NetPeer Peer, NetDataWriter Writer, byte MessageIndex, DeliveryMethod DeliveryMethod = DeliveryMethod.ReliableSequenced)
-    {
-        if (Writer.Length <= 0)
-        {
-            BNL.LogError("trying to sending a message without a length SendOutValidated : " + MessageIndex);
         }
         else
         {
-            if (MessageIndex <= BasisNetworkCommons.TotalChannels)
-            {
-                Peer.Send(Writer, MessageIndex, DeliveryMethod);
-              //  BNL.Log($"sent {MessageIndex}");
-            }
-            else
-            {
-                BNL.LogError($"Message was larger then the preprogrammed channels {BasisNetworkCommons.TotalChannels}");
-            }
+            client.Send(writer, channel, deliveryMethod);
         }
     }
-    public static bool CheckValidated(NetDataWriter Writer)
+    public static bool CheckValidated(NetDataWriter writer)
     {
-        if (Writer.Length == 0)
+        if (writer.Length == 0)
         {
-            BNL.LogError("trying to sending a message without a length!");
+            BNL.LogError("Trying to send a message with zero length!");
             return false;
         }
         return true;

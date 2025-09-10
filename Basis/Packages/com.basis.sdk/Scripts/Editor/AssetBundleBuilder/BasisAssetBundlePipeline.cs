@@ -5,7 +5,6 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
-
 public static class BasisAssetBundlePipeline
 {
     // Define static delegates
@@ -26,7 +25,6 @@ public static class BasisAssetBundlePipeline
     {
         return await BuildAssetBundle(false, originalPrefab, new Scene(), settings, Password, Target);
     }
-
     public static async Task<(bool, (BasisBundleGenerated, AssetBundleBuilder.InformationHash))> BuildAssetBundle(Scene scene, BasisAssetBundleObject settings, string Password, BuildTarget Target)
     {
         return await BuildAssetBundle(true, null, scene, settings, Password, Target);

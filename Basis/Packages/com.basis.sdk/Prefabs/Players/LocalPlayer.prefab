@@ -52,6 +52,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -73,6 +75,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 32767
@@ -255,7 +258,6 @@ MonoBehaviour:
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
-  m_Version: 2
   m_TaaSettings:
     m_Quality: 3
     m_FrameInfluence: 0.1
@@ -263,6 +265,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!114 &3245914674684743984
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -312,25 +315,30 @@ MonoBehaviour:
   DefaultCameraFov: 80
   BasisLockToInput: {fileID: 3806033592985501336}
   HasEvents: 0
-  CanvasTransform: {fileID: 7984352310526030848}
-  SpriteRendererIcon: {fileID: 8202654958605531215}
-  SpriteRendererIconTransform: {fileID: 2290955745392714449}
-  SpriteMicrophoneOn: {fileID: 21300000, guid: df4c5b7b152475f48adb88ead5775eb0, type: 3}
-  SpriteMicrophoneOff: {fileID: 21300000, guid: f184b79ab72cc224e94720390fb038c2, type: 3}
   DesktopMicrophoneViewportPosition: {x: 0.2, y: 0.15, z: 1}
-  VRMicrophoneOffset: {x: -0.0001, y: -0.00025, z: 1}
-  MuteSound: {fileID: 8300000, guid: 5b9ed5013ea1941499840ac97ad2b8e9, type: 3}
-  UnMuteSound: {fileID: 8300000, guid: fbd61add38ba2d04baedb52b69c6e1b3, type: 3}
-  AudioSource: {fileID: 3487408718883139867}
   NearClip: 0.01
-  StartingScale: {x: 0, y: 0, z: 0}
-  duration: 0.35
-  halfDuration: 0
-  largerScale: {x: 0, y: 0, z: 0}
-  UnMutedMutedIconColorActive: {r: 1, g: 1, b: 1, a: 0.6745098}
-  UnMutedMutedIconColorInactive: {r: 0.5, g: 0.5, b: 0.5, a: 0.6745098}
-  MutedColor: {r: 1, g: 0, b: 0, a: 0.6784314}
-  LocalIsTransmitting: 0
+  ParentOfUI: {fileID: 7984352310526030848}
+  microphoneIconDriver:
+    DisplayMode: 1
+    SpriteRendererIcon: {fileID: 8202654958605531215}
+    SpriteRendererIconTransform: {fileID: 2290955745392714449}
+    SpriteMicrophoneOn: {fileID: 21300000, guid: df4c5b7b152475f48adb88ead5775eb0, type: 3}
+    SpriteMicrophoneOff: {fileID: 21300000, guid: f184b79ab72cc224e94720390fb038c2, type: 3}
+    VRdesiredNormXY: {x: -0.42, y: -0.52}
+    VRextraViewportPad: 0.022
+    iconHalfRU: {x: 0, y: 0}
+    LocalIsTransmitting: 0
+    UnMutedMutedIconColorActive: {r: 1, g: 1, b: 1, a: 0.67058825}
+    UnMutedMutedIconColorInactive: {r: 0.5, g: 0.5, b: 0.5, a: 0.67058825}
+    MutedColor: {r: 1, g: 0, b: 0, a: 0.67058825}
+    StartingScale: {x: 0, y: 0, z: 0}
+    largerScale: {x: 0, y: 0, z: 0}
+    MuteSound: {fileID: 8300000, guid: 5b9ed5013ea1941499840ac97ad2b8e9, type: 3}
+    UnMuteSound: {fileID: 8300000, guid: fbd61add38ba2d04baedb52b69c6e1b3, type: 3}
+    AudioSource: {fileID: 3487408718883139867}
+    duration: 0.35
+    halfDuration: 0
+    CameraDriver: {fileID: 22857711927985140}
 --- !u!114 &3806033592985501336
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -344,7 +352,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TrackedRole: 0
-  AttachedInput: {fileID: 0}
+  BasisInput: {fileID: 0}
   HasEvent: 0
 --- !u!82 &3487408718883139867
 AudioSource:
@@ -355,7 +363,7 @@ AudioSource:
   m_GameObject: {fileID: 7399882423328331619}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -2806993401203009225, guid: 471a0209081144d4da2426822e8a0b47, type: 2}
+  OutputAudioMixerGroup: {fileID: -2806993401203009225, guid: 1ff7d045b2e32054aad6c5815495d8b8, type: 2}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
@@ -461,9 +469,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 7399882423328331619}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2ca35de189490844b1d7864bc416ffb, type: 3}
+  m_Script: {fileID: 11500000, guid: e74417ab1ea45f547b6134fbd0adc60d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  IgnoreRaycasting:
+    serializedVersion: 2
+    m_Bits: 4
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  LocalPlayerAvatar:
+    serializedVersion: 2
+    m_Bits: 0
   raycastDistance: 5
   hoverRadius: 0.5
   OnlySortClosest: 1
@@ -471,9 +488,6 @@ MonoBehaviour:
   LineMaterial: {fileID: 0}
   interactLineWidth: 0.015
   renderInteractLines: 1
-  InteractableLayerMask:
-    serializedVersion: 2
-    m_Bits: 289
 --- !u!1 &8538648612911191307
 GameObject:
   m_ObjectHideFlags: 0
@@ -522,12 +536,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   DisplayName: 
   UUID: 
+  SafeDisplayName: 
   BasisAvatar: {fileID: 0}
-  BasisAvatarTransform: {fileID: 0}
-  HasAvatarDriver: 0
+  AvatarTransform: {fileID: 0}
+  PlayerSelf: {fileID: 0}
   FaceIsVisible: 0
   FaceRenderer: {fileID: 0}
-  HasJiggles: 0
   IsConsideredFallBackAvatar: 1
   AvatarLoadMode: 0
   AvatarMetaData:
@@ -542,9 +556,7 @@ MonoBehaviour:
         AssetBundleName: 
         AssetBundleDescription: 
       BasisBundleGenerated: []
-  BasisAvatarStrainJiggleDriver:
-    Jiggler: {fileID: 0}
-    JiggleRigRendererLOD: {fileID: 0}
+      ImageBytes: 
   FacialBlinkDriver:
     meshRenderer: {fileID: 0}
     minBlinkInterval: 5
@@ -554,55 +566,6 @@ MonoBehaviour:
     blendShapeIndex: 
     blendShapeCount: 0
     LinkedPlayer: {fileID: 0}
-  GroundMask:
-    serializedVersion: 2
-    m_Bits: 1
-  HasEvents: 0
-  SpawnPlayerOnSceneLoad: 1
-  HasCalibrationEvents: 0
-  ToggleAvatarSim: 0
-  currentDistance: 0
-  direction:
-    x: 0
-    y: 0
-    z: 0
-  overshoot: 0
-  correction:
-    x: 0
-    y: 0
-    z: 0
-  output:
-    x: 0
-    y: 0
-    z: 0
-  CurrentHeight:
-    AvatarName: 
-    PlayerEyeHeight: 1.64
-    AvatarEyeHeight: 1.64
-    PlayerArmSpan: 1.7
-    AvatarArmSpan: 1.7
-    EyeRatioPlayerToDefaultScale: 1
-    EyeRatioAvatarToAvatarDefaultScale: 1
-    ArmRatioPlayerToDefaultScale: 1
-    ArmRatioAvatarToAvatarDefaultScale: 1
-    SelectedPlayerHeight: 1.7
-    SelectedAvatarHeight: 1.7
-    SelectedPlayerToDefaultScale: 1
-    SelectedAvatarToAvatarDefaultScale: 1
-  LastHeight:
-    AvatarName: 
-    PlayerEyeHeight: 1.64
-    AvatarEyeHeight: 1.64
-    PlayerArmSpan: 1.7
-    AvatarArmSpan: 1.7
-    EyeRatioPlayerToDefaultScale: 1
-    EyeRatioAvatarToAvatarDefaultScale: 1
-    ArmRatioPlayerToDefaultScale: 1
-    ArmRatioAvatarToAvatarDefaultScale: 1
-    SelectedPlayerHeight: 1.7
-    SelectedAvatarHeight: 1.7
-    SelectedPlayerToDefaultScale: 1
-    SelectedAvatarToAvatarDefaultScale: 1
   LocalCameraDriver: {fileID: 22857711927985140}
   LocalBoneDriver:
     ControlsLength: 0
@@ -610,28 +573,31 @@ MonoBehaviour:
     trackedRoles: 
     HasControls: 0
   LocalAvatarDriver:
-    SavedruntimeAnimatorController: {fileID: 0}
-    SkinnedMeshRenderer: []
-    Player: {fileID: 0}
-    CurrentlyTposing: 0
-    HasEvents: 0
-    ActiveMatrixOverrides: 
-    SkinnedMeshRendererLength: 0
-    HeadTwoBoneIK: {fileID: 0}
+    JiggleColliders: []
+    ScaleAvatarModification:
+      DuringCalibrationScale: {x: 1, y: 1, z: 1}
+      ApplyScale: 0
+      FinalScale: {x: 1, y: 1, z: 1}
+  LocalRigDriver:
+    MinCutoff: 5.5
+    Beta: 3.25
+    DerivativeCutoff: 3
+    SpineIK: {fileID: 0}
     LeftFootTwoBoneIK: {fileID: 0}
     RightFootTwoBoneIK: {fileID: 0}
     LeftHandTwoBoneIK: {fileID: 0}
     RightHandTwoBoneIK: {fileID: 0}
     UpperChestTwoBoneIK: {fileID: 0}
+    LeftToeConstraint: {fileID: 0}
+    RightToeConstraint: {fileID: 0}
     LeftToeRig: {fileID: 0}
     RightToeRig: {fileID: 0}
-    RigSpineRig: {fileID: 0}
-    RigHeadRig: {fileID: 0}
+    HeadRig: {fileID: 0}
+    SpineRig: {fileID: 0}
     LeftHandRig: {fileID: 0}
     RightHandRig: {fileID: 0}
     LeftFootRig: {fileID: 0}
     RightFootRig: {fileID: 0}
-    ChestSpineRig: {fileID: 0}
     LeftShoulderRig: {fileID: 0}
     RightShoulderRig: {fileID: 0}
     LeftHandLayer:
@@ -652,13 +618,13 @@ MonoBehaviour:
     RightToeLayer:
       m_Rig: {fileID: 0}
       m_Active: 0
-    RigHeadLayer:
-      m_Rig: {fileID: 0}
-      m_Active: 0
     RigSpineLayer:
       m_Rig: {fileID: 0}
       m_Active: 0
-    ChestSpineLayer:
+    RigChainSpineLayer:
+      m_Rig: {fileID: 0}
+      m_Active: 0
+    HeadLayer:
       m_Rig: {fileID: 0}
       m_Active: 0
     LeftShoulderLayer:
@@ -670,10 +636,6 @@ MonoBehaviour:
     Rigs: []
     Builder: {fileID: 0}
     AdditionalTransforms: []
-    HasTPoseEvent: 0
-    Locomotion: Locomotion
-    MaxExtendedDistance: 0
-    AvatarUPDownDirectionCalibration: {x: 0, y: 0, z: 0}
   LocalCharacterDriver:
     LocalPlayer: {fileID: 4587526044252889482}
     characterController: {fileID: 5548795088377030369}
@@ -760,8 +722,20 @@ MonoBehaviour:
     hipsDifferenceQ: {x: 0, y: 0, z: 0, w: 1}
     smoothFactor: 30
     smoothedRotation: {x: 0, y: 0, z: 0, w: 0}
-  LocalMuscleDriver:
-    RestingOnePoseData:
+  LocalHandDriver:
+    LeftHand:
+      ThumbPercentage: {x: 0, y: 0}
+      IndexPercentage: {x: 0, y: 0}
+      MiddlePercentage: {x: 0, y: 0}
+      RingPercentage: {x: 0, y: 0}
+      LittlePercentage: {x: 0, y: 0}
+    RightHand:
+      ThumbPercentage: {x: 0, y: 0}
+      IndexPercentage: {x: 0, y: 0}
+      MiddlePercentage: {x: 0, y: 0}
+      RingPercentage: {x: 0, y: 0}
+      LittlePercentage: {x: 0, y: 0}
+    Current:
       LeftThumb: []
       LeftIndex: []
       LeftMiddle: []
@@ -772,18 +746,6 @@ MonoBehaviour:
       RightMiddle: []
       RightRing: []
       RightLittle: []
-    CurrentOnPoseData:
-      LeftThumb: []
-      LeftIndex: []
-      LeftMiddle: []
-      LeftRing: []
-      LeftLittle: []
-      RightThumb: []
-      RightIndex: []
-      RightMiddle: []
-      RightRing: []
-      RightLittle: []
-    increment: 0.2
     LeftThumb: []
     LeftIndex: []
     LeftMiddle: []
@@ -794,22 +756,6 @@ MonoBehaviour:
     RightMiddle: []
     RightRing: []
     RightLittle: []
-    LeftFinger:
-      ThumbPercentage: {x: 0, y: 0}
-      IndexPercentage: {x: 0, y: 0}
-      MiddlePercentage: {x: 0, y: 0}
-      RingPercentage: {x: 0, y: 0}
-      LittlePercentage: {x: 0, y: 0}
-      jointPositions: []
-      jointRotations: []
-    RightFinger:
-      ThumbPercentage: {x: 0, y: 0}
-      IndexPercentage: {x: 0, y: 0}
-      MiddlePercentage: {x: 0, y: 0}
-      RingPercentage: {x: 0, y: 0}
-      LittlePercentage: {x: 0, y: 0}
-      jointPositions: []
-      jointRotations: []
     LastLeftThumbPercentage: {x: -1.1, y: -1.1}
     LastLeftIndexPercentage: {x: -1.1, y: -1.1}
     LastLeftMiddlePercentage: {x: -1.1, y: -1.1}
@@ -820,7 +766,6 @@ MonoBehaviour:
     LastRightMiddlePercentage: {x: -1.1, y: -1.1}
     LastRightRingPercentage: {x: -1.1, y: -1.1}
     LastRightLittlePercentage: {x: -1.1, y: -1.1}
-    CoordKeys: []
     LeftThumbAdditional:
       PoseData:
         LeftThumb: []
@@ -952,8 +897,7 @@ MonoBehaviour:
         RightLittle: []
       Coord: {x: 0, y: 0}
     LerpSpeed: 17
-    allHasProximal: 
-    allTransforms: []
+    Poses: []
   LocalEyeDriver:
     leftEyeInitialRotation:
       value:
@@ -978,57 +922,23 @@ MonoBehaviour:
     rightEyeTransform: {fileID: 0}
     HeadTransform: {fileID: 0}
     LeftEyeInitallocalSpace:
-      rotation:
-        value:
-          x: 0
-          y: 0
-          z: 0
-          w: 0
-      position:
-        x: 0
-        y: 0
-        z: 0
+      rotation: {x: 0, y: 0, z: 0, w: 0}
+      position: {x: 0, y: 0, z: 0}
     RightEyeInitallocalSpace:
-      rotation:
-        value:
-          x: 0
-          y: 0
-          z: 0
-          w: 0
-      position:
-        x: 0
-        y: 0
-        z: 0
-    RandomizedPosition:
-      x: 0
-      y: 0
-      z: 0
+      rotation: {x: 0, y: 0, z: 0, w: 0}
+      position: {x: 0, y: 0, z: 0}
+    RandomizedPosition: {x: 0, y: 0, z: 0}
     HasLeftEye: 0
     HasRightEye: 0
     LeftEyeHasGizmo: 0
     RightEyeHasGizmo: 0
     LeftEyeGizmoIndex: 0
     RightEyeGizmoIndex: 0
-    LeftEyeTargetWorld:
-      x: 0
-      y: 0
-      z: 0
-    RightEyeTargetWorld:
-      x: 0
-      y: 0
-      z: 0
-    CenterTargetWorld:
-      x: 0
-      y: 0
-      z: 0
-    AppliedOffset:
-      x: 0
-      y: 0
-      z: 0
-    EyeForwards:
-      x: 0
-      y: 0
-      z: 1
+    LeftEyeTargetWorld: {x: 0, y: 0, z: 0}
+    RightEyeTargetWorld: {x: 0, y: 0, z: 0}
+    CenterTargetWorld: {x: 0, y: 0, z: 0}
+    AppliedOffset: {x: 0, y: 0, z: 0}
+    EyeForwards: {x: 0, y: 0, z: 1}
     CurrentLookAroundInterval: 0
     timer: 0
     DistanceBeforeTeleport: 30
@@ -1047,6 +957,22 @@ MonoBehaviour:
     WasSuccessful: 0
     HashInstanceID: -1
     uLipSyncEnabledState: 1
+  CurrentHeight:
+    AvatarName: 
+    PlayerEyeHeight: 1.64
+    AvatarEyeHeight: 1.64
+    PlayerArmSpan: 1.7
+    AvatarArmSpan: 1.7
+    CustomPlayerEyeHeight: 1.7
+    CustomAvatarEyeHeight: 1.7
+    EyeRatioPlayerToDefaultScale: 1
+    EyeRatioAvatarToAvatarDefaultScale: 1
+    ArmRatioPlayerToDefaultScale: 1
+    ArmRatioAvatarToAvatarDefaultScale: 1
+    SelectedPlayerHeight: 1.7
+    SelectedAvatarHeight: 1.7
+    SelectedPlayerToDefaultScale: 1
+    SelectedAvatarToAvatarDefaultScale: 1
 --- !u!143 &5548795088377030369
 CharacterController:
   m_ObjectHideFlags: 0

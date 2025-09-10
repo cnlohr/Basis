@@ -9,6 +9,8 @@ using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Drivers;
 using Basis.Scripts.Device_Management;
 using Basis.Scripts.BasisSdk.Helpers;
+using Basis.Scripts.BasisSdk.Interactions;
+using Basis.Scripts.Addressable_Driver.Resource;
 
 public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
 {
@@ -22,6 +24,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
     public TextMeshProUGUI countdownText;
     [SerializeField] public BasisHandHeldCameraUI HandHeld = new BasisHandHeldCameraUI();
     [SerializeField] public BasisDepthOfFieldInteractionHandler BasisDOFInteractionHandler;
+    [SerializeField] private BasisHandHeldCameraInteractable interactable;
 
     [Header("Settings")]
     [Tooltip("Width of the captured photo")]
@@ -95,6 +98,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         BasisDeviceManagement.OnBootModeChanged -= OnBootModeChanged;
         OnPickupUse -= OnPickupUseCapture;
         base.OnDestroy();
+        AddressableResourceProcess.ReleaseGameobject(this.gameObject);
     }
     private void OnEnable()
     {
@@ -131,6 +135,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         basisMeshRendererCheck = BasisHelpers.GetOrAddComponent<BasisMeshRendererCheck>(Renderer.gameObject);
         basisMeshRendererCheck.Check += VisibilityFlag;
         await HandHeld.Initialize(this);
+        interactable.SetCameraUI(HandHeld);
     }
 
     private void InitializeTonemapping()
@@ -185,16 +190,16 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
             }
         }
     }
-        public new void Start()
+    public new void Start()
     {
         base.Start();
 
         OnPickupUse += OnPickupUseCapture;
     }
 
-    public void OnPickupUseCapture(PickUpUseMode mode)
+    public void OnPickupUseCapture(BasisPickUpUseMode mode)
     {
-        if (mode == PickUpUseMode.OnPickUpUseDown)
+        if (mode == BasisPickUpUseMode.OnPickUpUseDown)
         {
             CapturePhoto();
         }
@@ -473,9 +478,11 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         MetaData.tonemapping.mode.value = mappingMode;
     }
 
-    private void OnBootModeChanged(string obj)
+    private new void OnBootModeChanged(string obj)
     {
         OverrideDesktopOutput();
+
+       // base.OnBootModeChanged(obj);
     }
 
     private void UnsubscribeMeshRendererCheck()
@@ -498,7 +505,6 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
             {
                 captureCamera.enabled = false;
                 LastVisibilityState = false;
-                BasisLocalPlayer.Instance.LocalAvatarDriver.RemoveActiveMatrixOverride(InstanceID);
             }
         }
         else
@@ -507,7 +513,6 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
             {
                 captureCamera.enabled = true;
                 LastVisibilityState = true;
-                BasisLocalPlayer.Instance.LocalAvatarDriver.TryActiveMatrixOverride(InstanceID);
             }
         }
     }

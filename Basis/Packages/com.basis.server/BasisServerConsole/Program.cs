@@ -2,6 +2,8 @@ using Basis.Network;
 using Basis.Network.Server;
 using BasisNetworkConsole;
 using BasisNetworking.InitalData;
+using BasisNetworkServer.BasisNetworking;
+using BasisNetworkServer.BasisNetworkingReductionSystem;
 namespace Basis
 {
     class Program
@@ -23,9 +25,6 @@ namespace Basis
             string configFilePath = Path.Combine(configDir, "config.xml");
             Configuration config = Configuration.LoadFromXml(configFilePath);
             config.ProcessEnvironmentalOverrides();
-
-            ThreadPool.SetMinThreads(config.MinThreadPoolThreads, config.MinThreadPoolThreads);
-            ThreadPool.SetMaxThreads(config.MaxThreadPoolThreads, config.MaxThreadPoolThreads);
 
             string folderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Configuration.LogsFolderName);
             BasisServerSideLogging.Initialize(config, folderPath);
@@ -71,7 +70,8 @@ namespace Basis
                 BNL.Log("Shutting down server...");
                 isRunning = false;
                 shutdownEvent.Set(); // Signal the main thread to exit
-
+                BasisPersistentDatabase.Shutdown();
+                BasisServerReductionSystemEvents.Shutdown();
                 if (config.EnableStatistics) BasisStatistics.StopWorkerThread();
                 await BasisServerSideLogging.ShutdownAsync();
                 BNL.Log("Server shut down successfully.");

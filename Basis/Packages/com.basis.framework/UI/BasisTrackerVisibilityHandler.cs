@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using Basis.Scripts.Device_Management;
 using Basis.Scripts.UI.UI_Panels;
@@ -34,14 +34,7 @@ namespace Basis.Scripts.UI
             if (shouldBeVisible != wasVisible)
             {
                 wasVisible = shouldBeVisible;
-                if (shouldBeVisible)
-                {
-                    BasisDeviceManagement.ShowTrackers();
-                }
-                else
-                {
-                    BasisDeviceManagement.HideTrackers();
-                }
+                BasisDeviceManagement.VisibleTrackers(shouldBeVisible);
             }
         }
     }

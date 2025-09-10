@@ -22,7 +22,7 @@ public class BasisNetworkServerRunner
             try
             {
                 NetworkServer.StartServer(Configuration);
-                NetworkServer.authIdentity.AddNetPeerAsAdmin(UUIDTomarkAsAdmin);
+                NetworkServer.AuthIdentity.AddNetPeerAsAdmin(UUIDTomarkAsAdmin);
             }
             catch (Exception ex)
             {

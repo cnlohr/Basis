@@ -26,7 +26,7 @@ namespace BasisDidLink
     public class BasisDIDAuthIdentity : IAuthIdentity
     {
         internal readonly DidAuthentication DidAuth;
-        public ConcurrentDictionary<NetPeer, OnAuth> AuthIdentity = new ConcurrentDictionary<NetPeer, OnAuth>();
+        public ConcurrentDictionary<ushort, OnAuth> AuthIdentity = new ConcurrentDictionary<ushort, OnAuth>();
         private readonly ConcurrentDictionary<NetPeer, CancellationTokenSource> _timeouts = new ConcurrentDictionary<NetPeer, CancellationTokenSource>();
         public List<string> Admins = new List<string>();
         public static readonly string FilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Configuration.ConfigFolderName, "admins.xml");
@@ -111,14 +111,14 @@ namespace BasisDidLink
                         ReadyMessage = readyMessage
                     };
 
-                    if (AuthIdentity.TryAdd(newPeer, OnAuth))
+                    if (AuthIdentity.TryAdd((ushort)newPeer.Id, OnAuth))
                     {
                         readyMessage.playerMetaDataMessage.playerUUID = playerDid.V;
                         NetDataWriter Writer = new NetDataWriter();
                         BytesMessage NetworkMessage = new BytesMessage();
                         NetworkMessage.Serialize(Writer, OnAuth.Challenge.Nonce.V);
                         BNL.Log("Sending out Writer with size : " + Writer.Length);
-                        NetworkServer.SendOutValidated(newPeer, Writer, BasisNetworkCommons.AuthIdentityMessage, DeliveryMethod.ReliableOrdered);
+                        NetworkServer.TrySend(newPeer, Writer, BasisNetworkCommons.AuthIdentityChannel, DeliveryMethod.ReliableOrdered);
 
                         CancellationTokenSource cts = new CancellationTokenSource();
                         _timeouts[newPeer] = cts;
@@ -150,7 +150,7 @@ namespace BasisDidLink
             {
                 await Task.Delay(NetworkServer.Configuration.AuthValidationTimeOutMiliseconds, cts.Token);
                 if (!_timeouts.ContainsKey(newPeer)) return;
-                AuthIdentity.TryRemove(newPeer, out _);
+                AuthIdentity.TryRemove((ushort)newPeer.Id, out _);
                 _timeouts.TryRemove(newPeer, out _);
                 BNL.Log($"Authentication timeout for {UUID}.");
                 BasisServerHandleEvents.RejectWithReason(newPeer, "Authentication timeout");
@@ -183,7 +183,7 @@ namespace BasisDidLink
                 DidUrlFragment Fragment = new DidUrlFragment(FragmentAsString);
                 Response response = new Response(Sig, Fragment);
 
-                if (AuthIdentity.TryGetValue(newPeer, out OnAuth authIdentity))
+                if (AuthIdentity.TryGetValue((ushort)newPeer.Id, out OnAuth authIdentity))
                 {
                     Challenge challenge = authIdentity.Challenge;
                     bool isAuthenticated = await RecvChallengeResponse(response, challenge);
@@ -221,7 +221,7 @@ namespace BasisDidLink
             return result.IsOk;
         }
 
-        public void RemoveConnection(NetPeer NetPeer)
+        public void RemoveConnection(ushort NetPeer)
         {
             AuthIdentity.TryRemove(NetPeer, out var authIdentity);
         }
@@ -312,7 +312,7 @@ namespace BasisDidLink
 
         public bool NetIDToUUID(NetPeer Peer, out string UUID)
         {
-            if (AuthIdentity.TryGetValue(Peer, out OnAuth OnAuth))
+            if (AuthIdentity.TryGetValue((ushort)Peer.Id, out OnAuth OnAuth))
             {
                 UUID = OnAuth.Did.V;
                 return true;
@@ -321,9 +321,9 @@ namespace BasisDidLink
             return false;
         }
 
-        public bool UUIDToNetID(string UUID, out NetPeer Peer)
+        public bool UUIDToNetID(string UUID, out ushort Peer)
         {
-            foreach (KeyValuePair<NetPeer, OnAuth> Pair in AuthIdentity)
+            foreach (KeyValuePair<ushort, OnAuth> Pair in AuthIdentity)
             {
                 if (Pair.Value.Did.V == UUID)
                 {
@@ -331,7 +331,7 @@ namespace BasisDidLink
                     return true;
                 }
             }
-            Peer = null;
+            Peer = 0;
             return false;
         }
 

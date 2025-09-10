@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "InputAction",
     "maps": [
         {
@@ -87,6 +88,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "HotSwtichToVR",
+                    "type": "Button",
+                    "id": "32ab82cc-e8ad-4b10-90d8-b65f634e649a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "LeftMouse",
                     "type": "Button",
                     "id": "46fcae41-15d1-4d62-8313-d820f521e2f2",
@@ -130,6 +140,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Desktop Left",
+                    "type": "Button",
+                    "id": "e030056a-bc4b-4cb1-bce1-8acf3cde04c9",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Desktop Right",
+                    "type": "Button",
+                    "id": "993c2420-16b9-4f6c-83f9-3b9ce0eb4edc",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -138,7 +166,7 @@
                     "id": "978bfe49-cc26-4a3d-ab7b-7d7a29327403",
                     "path": "<Gamepad>/leftStick",
                     "interactions": "",
-                    "processors": "",
+                    "processors": "StickDeadzone",
                     "groups": ";Gamepad",
                     "action": "Move",
                     "isComposite": false,
@@ -248,7 +276,7 @@
                     "id": "3ea4d645-4504-4529-b061-ab81934c3752",
                     "path": "<Joystick>/stick",
                     "interactions": "",
-                    "processors": "",
+                    "processors": "StickDeadzone",
                     "groups": "Joystick",
                     "action": "Move",
                     "isComposite": false,
@@ -259,7 +287,7 @@
                     "id": "c1f7a91b-d0fd-4a62-997e-7fb9b69bf235",
                     "path": "<Gamepad>/rightStick",
                     "interactions": "",
-                    "processors": "ScaleVector2(x=25,y=25)",
+                    "processors": "ScaleVector2(x=25,y=25),StickDeadzone",
                     "groups": ";Gamepad",
                     "action": "Look",
                     "isComposite": false,
@@ -281,7 +309,7 @@
                     "id": "3e5f5442-8668-4b27-a940-df99bad7e831",
                     "path": "<Joystick>/{Hatswitch}",
                     "interactions": "",
-                    "processors": "",
+                    "processors": "StickDeadzone",
                     "groups": "Joystick",
                     "action": "Look",
                     "isComposite": false,
@@ -443,6 +471,17 @@
                 },
                 {
                     "name": "",
+                    "id": "bae8c2bf-4913-477b-95e7-50cebb6e3e6f",
+                    "path": "<Keyboard>/f11",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";All",
+                    "action": "HotSwtichToVR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "f1a7bc00-8128-4474-8413-55d078602273",
                     "path": "<Mouse>/leftButton",
                     "interactions": "",
@@ -504,6 +543,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "MiddleMouse",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "20839d3c-32aa-4639-851e-33a180379edd",
+                    "path": "<Keyboard>/comma",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";All",
+                    "action": "Desktop Left",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8ffec8d5-370f-450c-a506-664aa9124a55",
+                    "path": "<Keyboard>/period",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";All",
+                    "action": "Desktop Right",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

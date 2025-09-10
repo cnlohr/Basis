@@ -67,12 +67,14 @@ namespace Basis.Scripts.Editor
 
                 if (avatar.gameObject.TryGetComponent(out avatar.Animator))
                 {
+                    avatar.AnimatorHumanScale  = Vector3.one / avatar.Animator.humanScale;
                     return true;
                 }
                 Animator Anim = avatar.gameObject.GetComponentInChildren<Animator>();
                 if (Anim != null)
                 {
                     avatar.Animator = Anim;
+                    avatar.AnimatorHumanScale = Vector3.one / Anim.humanScale;
                     return true;
                 }
             }
@@ -110,7 +112,8 @@ namespace Basis.Scripts.Editor
                 Vector3 EyePosition = Vector3.Lerp(LeftEye, RightEye, 0.5f);
 
                 float3 Bottom = avatar.Animator.transform.position;
-                Vector3 Space = BasisHelpers.ConvertToLocalSpace(EyePosition, Bottom);
+                Vector3 Space = BasisHelpers.ConvertToLocalSpace(EyePosition, Bottom, avatar.Animator.transform.rotation);
+
                 avatar.AvatarEyePosition = BasisHelpers.AvatarPositionConversion(Space);
                 EditorUtility.SetDirty(avatar);
             }
@@ -121,16 +124,11 @@ namespace Basis.Scripts.Editor
             {
                 return;
             }
+            Vector3 estimatedMouthPosition = Head.position + Head.TransformDirection(BasisHelpers.ScaleVector(mouthOffset));//height
+            Vector3 Space = BasisHelpers.ConvertToLocalSpace(estimatedMouthPosition,avatar.Animator.transform.position, avatar.Animator.transform.rotation);
 
-            if (BasisHelpers.TryGetVector3Bone(avatar.Animator, HumanBodyBones.LeftFoot, out Vector3 LeftFoot) && BasisHelpers.TryGetVector3Bone(avatar.Animator, HumanBodyBones.RightFoot, out Vector3 RightFoot))
-            {
-                Vector3 Bottom = Vector3.Lerp(LeftFoot, RightFoot, 0.5f);
-                Vector3 estimatedMouthPosition = Head.position + Head.TransformDirection(BasisHelpers.ScaleVector(mouthOffset));//height
-
-                Vector3 Space = BasisHelpers.ConvertToLocalSpace(estimatedMouthPosition, Bottom);
-                avatar.AvatarMouthPosition = BasisHelpers.AvatarPositionConversion(Space);
-                EditorUtility.SetDirty(avatar);
-            }
+            avatar.AvatarMouthPosition = BasisHelpers.AvatarPositionConversion(Space);
+            EditorUtility.SetDirty(avatar);
         }
         private static void UpdateAvatarRenders(BasisAvatar avatar)
         {

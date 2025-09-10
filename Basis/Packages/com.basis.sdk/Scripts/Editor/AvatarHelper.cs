@@ -43,6 +43,14 @@ public static class AvatarHelper
     };
     public static List<string> FindAllNames(SkinnedMeshRenderer Renderer)
     {
+        if(Renderer == null)
+        {
+            return new List<string>();
+        }
+        if(Renderer.sharedMesh == null)
+        {
+            return new List<string>();
+        }
         List<string> OnMeshBlendShapes = new List<string>();
         int BlendCount = Renderer.sharedMesh.blendShapeCount;
         for (int Index = 0; Index < BlendCount; Index++)

@@ -86,7 +86,7 @@ namespace LiteNetLib
                 case SocketError.TimedOut:
                 case SocketError.NetworkReset:
                 case SocketError.WouldBlock:
-                    //NetDebug.Write($"[R]Ignored error: {(int)ex.SocketErrorCode} - {ex}");
+                    ////NetDebug.Write($"[R]Ignored error: {(int)ex.SocketErrorCode} - {ex}");
                     break;
                 default:
                     NetDebug.WriteError($"[R]Error code: {(int)ex.SocketErrorCode} - {ex}");
@@ -206,7 +206,7 @@ namespace LiteNetLib
                     return ProcessError(new SocketException((int)NativeSocket.GetSocketError())) == false;
                 }
 
-                //NetDebug.WriteForce($"[R]Received data from {endPoint}, result: {packet.Size}");
+                ////NetDebug.WriteForce($"[R]Received data from {endPoint}, result: {packet.Size}");
                 //refresh temp Addr/Port
                 short family = (short)((address[1] << 8) | address[0]);
                 tempEndPoint.Port = (ushort)((address[2] << 8) | address[3]);
@@ -304,7 +304,7 @@ namespace LiteNetLib
                         selectReadList.Add(socketV6);
                         Socket.Select(selectReadList, null, null, ReceivePollingTime);
                     }
-                    //NetDebug.Write(NetLogLevel.Trace, $"[R]Received data from {bufferEndPoint}, result: {packet.Size}");
+                    ////NetDebug.Write(NetLogLevel.Trace, $"[R]Received data from {bufferEndPoint}, result: {packet.Size}");
                 }
                 catch (SocketException ex)
                 {
@@ -452,7 +452,7 @@ namespace LiteNetLib
             try
             {
                 socket.Bind(ep);
-                NetDebug.Write(NetLogLevel.Trace, $"[B]Successfully binded to port: {((IPEndPoint)socket.LocalEndPoint).Port}, AF: {socket.AddressFamily}");
+                //NetDebug.Write(NetLogLevel.Trace, $"[B]Successfully binded to port: {((IPEndPoint)socket.LocalEndPoint).Port}, AF: {socket.AddressFamily}");
 
                 //join multicast
                 if (ep.AddressFamily == AddressFamily.InterNetworkV6)
@@ -561,7 +561,7 @@ namespace LiteNetLib
                     result = socket.SendTo(message, start, length, SocketFlags.None, remoteEndPoint);
 #endif
                 }
-                //NetDebug.WriteForce("[S]Send packet to {0}, result: {1}", remoteEndPoint, result);
+                ////NetDebug.WriteForce("[S]Send packet to {0}, result: {1}", remoteEndPoint, result);
             }
             catch (SocketException ex)
             {
@@ -571,7 +571,7 @@ namespace LiteNetLib
                     case SocketError.Interrupted:
                         return 0;
                     case SocketError.MessageSize:
-                        NetDebug.Write(NetLogLevel.Trace, $"[SRD] 10040, datalen: {length}");
+                        //NetDebug.Write(NetLogLevel.Trace, $"[SRD] 10040, datalen: {length}");
                         return 0;
 
                     case SocketError.HostUnreachable:

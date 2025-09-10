@@ -1,10 +1,7 @@
 using Basis;
 using Basis.Network.Server.Generic;
-using BasisNetworkCore;
 using LiteNetLib;
 using System.Reflection;
-using static BasisNetworkCore.Serializable.SerializableBasis;
-
 namespace BasisNetworkConsole
 {
     public static class BasisConsoleCommands
@@ -103,28 +100,25 @@ namespace BasisNetworkConsole
                     string? input = Console.ReadLine()?.Trim();
                     if (string.IsNullOrEmpty(input)) continue;
 
-                    // Try to match the longest possible command key
+                    string[] parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     bool matched = false;
 
-                    foreach (var key in commands.Keys.OrderByDescending(k => k.Length))
+                    // Try to match the longest possible command
+                    for (int i = parts.Length; i > 0; i--)
                     {
-                        if (input.StartsWith(key, StringComparison.InvariantCultureIgnoreCase))
+                        string potentialCommand = string.Join(' ', parts.Take(i)).ToLower();
+
+                        if (commands.TryGetValue(potentialCommand, out var command))
                         {
-                            var command = commands[key];
-
-                            // Get arguments by removing the command part from input
-                            string remaining = input.Substring(key.Length).Trim();
-                            string[] args = string.IsNullOrEmpty(remaining) ? Array.Empty<string>() : remaining.Split(' ');
-
+                            string[] args = parts.Skip(i).ToArray();
                             try
                             {
                                 command.Handler(args);
                             }
                             catch (Exception ex)
                             {
-                                BNL.Log($"Error executing command '{key}': {ex.Message}");
+                                BNL.Log($"Error executing command '{potentialCommand}': {ex.Message}");
                             }
-
                             matched = true;
                             break;
                         }
@@ -146,7 +140,7 @@ namespace BasisNetworkConsole
             if (args.Length >= 1)
             {
                 string value = args[0];
-                if (NetworkServer.authIdentity.AddNetPeerAsAdmin(value))
+                if (NetworkServer.AuthIdentity.AddNetPeerAsAdmin(value))
                 {
                     BNL.Log($"Added Admin {value}");
                 }
@@ -162,10 +156,10 @@ namespace BasisNetworkConsole
         }
         public static void HandleShowPlayers(string[] args)
         {
-            string ConnectedPlayerNames = $"Connected Player count is {NetworkServer.Peers.Count} ";
-            foreach(NetPeer Peer in NetworkServer.Peers.Values)
+            string ConnectedPlayerNames = $"Connected Player count is {NetworkServer.AuthenticatedPeers.Count} ";
+            foreach(NetPeer Peer in NetworkServer.AuthenticatedPeers.Values)
             {
-                if(BasisSavedState.GetLastPlayerMetaData(Peer,out SerializableBasis.PlayerMetaDataMessage Message))
+                if(BasisSavedState.GetLastPlayerMetaData(Peer,out SerializableBasis.ClientMetaDataMessage Message))
                 {
                     ConnectedPlayerNames += $"Player: {Message.playerDisplayName} UUID: {Message.playerUUID}, ";
                 }

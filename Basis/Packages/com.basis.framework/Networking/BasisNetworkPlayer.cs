@@ -1,18 +1,20 @@
 using Basis.Network.Core;
 using Basis.Scripts.BasisSdk;
 using Basis.Scripts.BasisSdk.Players;
+using Basis.Scripts.Behaviour;
 using Basis.Scripts.Common;
 using Basis.Scripts.Device_Management;
 using Basis.Scripts.Device_Management.Devices;
+using Basis.Scripts.Drivers;
 using Basis.Scripts.Profiler;
 using Basis.Scripts.TransformBinders.BoneControl;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
-using System.Data;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UIElements;
 using static BasisNetworkGenericMessages;
 using static BasisNetworkPrimitiveCompression;
 using static SerializableBasis;
@@ -25,17 +27,19 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
     [System.Serializable]
     public abstract class BasisNetworkPlayer
     {
+        /// <summary>
+        /// only changes when additional avatar data is in play!
+        /// </summary>
+        public byte LastLinkedAvatarIndex = 0;
         private readonly object _lock = new object(); // Lock object for thread-safety
         private bool _hasReasonToSendAudio;
         public static BasisRangedUshortFloatData RotationCompression = new BasisRangedUshortFloatData(-1f, 1f, 0.001f);
+        public const int MuscleCount = 95;
         [SerializeField]
-        public HumanPose HumanPose = new HumanPose();
+        public HumanPose HumanPose = new HumanPose() { muscles = new float[MuscleCount] };
         [SerializeField]
         public HumanPoseHandler PoseHandler;
-        public BasisBoneControl MouthBone;
         public BasisPlayer Player;
-        [SerializeField]
-        public PlayerIdMessage PlayerIDMessage;
         public bool hasID = false;
         public bool HasReasonToSendAudio
         {
@@ -54,20 +58,12 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
                 }
             }
         }
-        public ushort NetId
+        public ushort playerId;
+        public Dictionary<byte, ServerAvatarDataMessageQueue> NextMessages = new Dictionary<byte, ServerAvatarDataMessageQueue>();
+        public struct ServerAvatarDataMessageQueue
         {
-            get
-            {
-                if (hasID)
-                {
-                    return PlayerIDMessage.playerID;
-                }
-                else
-                {
-                    BasisDebug.LogError("Missing Network ID!");
-                    return 0;
-                }
-            }
+            public ServerAvatarDataMessage ServerAvatarDataMessage;
+            public LiteNetLib.DeliveryMethod Method;
         }
         public abstract void Initialize();
         public abstract void DeInitialize();
@@ -83,7 +79,7 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         {
             if (BasisNetworkManagement.IsMainThread())
             {
-                AvatarCalibrationSetup();
+                AvatarLoadComplete();
             }
             else
             {
@@ -96,30 +92,40 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
                 // Post the task to the main thread
                 BasisNetworkManagement.MainThreadContext.Post(_ =>
                 {
-                    AvatarCalibrationSetup();
+                    AvatarLoadComplete();
                 }, null);
             }
         }
-        public void AvatarCalibrationSetup()
+        public int NetworkBehaviourCount = 0;
+        public BasisAvatarMonoBehaviour[] NetworkBehaviours;
+        public void AvatarLoadComplete()
         {
             if (CheckForAvatar())
             {
                 BasisAvatar basisAvatar = Player.BasisAvatar;
-                // All checks passed
+                // All checks pas
                 PoseHandler = new HumanPoseHandler(
                     basisAvatar.Animator.avatar,
-                    Player.BasisAvatarTransform
+                    Player.AvatarTransform
                 );
                 PoseHandler.GetHumanPose(ref HumanPose);
-                if (!basisAvatar.HasSendEvent)
+                basisAvatar.LinkedPlayerID = playerId;
+                NetworkBehaviours = Player.BasisAvatar.GetComponentsInChildren<BasisAvatarMonoBehaviour>(true);
+                NetworkBehaviourCount = NetworkBehaviours.Length;
+                int length = NetworkBehaviours.Length;
+                if (length > 256)
                 {
-                    basisAvatar.OnNetworkMessageSend += OnNetworkMessageSend;
-                    basisAvatar.OnServerReductionSystemMessageSend += OnServerReductionSystemMessageSend;
-                    basisAvatar.HasSendEvent = true;
+                    BasisDebug.LogError($"To Many Mono Behaviours on this Avatar only supports up to 256 was {length}!");
+                    return;
                 }
-
-                basisAvatar.LinkedPlayerID = NetId;
-                basisAvatar.OnAvatarNetworkReady?.Invoke(Player.IsLocal);
+                for (byte Index = 0; Index < length; Index++)
+                {
+                    NetworkBehaviours[Index].OnNetworkAssign(Index, this);
+                }
+            }
+            else
+            {
+                BasisDebug.LogError("Unable to proceed with Avatar Load Complete!");
             }
         }
         public bool CheckForAvatar()
@@ -137,67 +143,74 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
             }
             return true;
         }
-        private void OnServerReductionSystemMessageSend(byte MessageIndex, byte[] buffer = null)
+        public void OnAvatarServerReductionSystemMessageSend(byte MessageIndex, byte[] buffer = null)
         {
-            if (BasisNetworkManagement.Instance != null && BasisNetworkManagement.Instance.Transmitter != null)
+            if (BasisNetworkManagement.Instance != null && BasisNetworkManagement.Transmitter != null)
             {
                 AdditionalAvatarData AAD = new AdditionalAvatarData
                 {
                     array = buffer,
                     messageIndex = MessageIndex
                 };
-                BasisNetworkManagement.Instance.Transmitter.AddAdditional(AAD);
+                BasisNetworkManagement.Transmitter.AddAdditional(AAD);
             }
             else
             {
                 BasisDebug.LogError("Missing Transmitter or Network Management", BasisDebug.LogTag.Networking);
             }
         }
-        private void OnNetworkMessageSend(byte MessageIndex, byte[] buffer = null, DeliveryMethod DeliveryMethod = DeliveryMethod.Sequenced, ushort[] Recipients = null)
+        public void OnAvatarNetworkMessageSend(byte MessageIndex, byte[] buffer = null, DeliveryMethod DeliveryMethod = DeliveryMethod.Sequenced, ushort[] Recipients = null)
         {
             // Handle cases based on presence of Recipients and buffer
             AvatarDataMessage AvatarDataMessage = new AvatarDataMessage
             {
+                PlayerIdMessage = new PlayerIdMessage() { playerID = playerId },
                 messageIndex = MessageIndex,
                 payload = buffer,
                 recipients = Recipients,
-                PlayerIdMessage = new PlayerIdMessage() { playerID = NetId },
+                AvatarLinkIndex = LastLinkedAvatarIndex,
+                recipientsSize = 0,
             };
             NetDataWriter netDataWriter = new NetDataWriter();
             if (DeliveryMethod == DeliveryMethod.Unreliable)
             {
                 netDataWriter.Put(BasisNetworkCommons.AvatarChannel);
                 AvatarDataMessage.Serialize(netDataWriter);
-                BasisNetworkManagement.LocalPlayerPeer.Send(netDataWriter, BasisNetworkCommons.FallChannel, DeliveryMethod);
+                BasisNetworkConnection.LocalPlayerPeer.Send(netDataWriter, BasisNetworkCommons.FallChannel, DeliveryMethod);
             }
             else
             {
                 AvatarDataMessage.Serialize(netDataWriter);
-                BasisNetworkManagement.LocalPlayerPeer.Send(netDataWriter, BasisNetworkCommons.AvatarChannel, DeliveryMethod);
+                BasisNetworkConnection.LocalPlayerPeer.Send(netDataWriter, BasisNetworkCommons.AvatarChannel, DeliveryMethod);
             }
             BasisNetworkProfiler.AddToCounter(BasisNetworkProfilerCounter.AvatarDataMessage, netDataWriter.Length);
         }
-        public void ProvideNetworkKey(ushort PlayerID)
-        {
-            PlayerIDMessage.playerID = PlayerID;
-            hasID = true;
-        }
         public static bool AvatarToPlayer(BasisAvatar Avatar, out BasisPlayer BasisPlayer)
         {
-            return BasisNetworkManagement.AvatarToPlayer(Avatar, out BasisPlayer);
+            return BasisNetworkPlayers.AvatarToPlayer(Avatar, out BasisPlayer);
         }
         public static bool PlayerToNetworkedPlayer(BasisPlayer BasisPlayer, out BasisNetworkPlayer BasisNetworkPlayer)
         {
-            return BasisNetworkManagement.PlayerToNetworkedPlayer(BasisPlayer, out BasisNetworkPlayer);
+            return BasisNetworkPlayers.PlayerToNetworkedPlayer(BasisPlayer, out BasisNetworkPlayer);
         }
-        public static BasisNetworkPlayer LocalPlayer => BasisNetworkManagement.LocalNetworkedPlayer;
+        public static BasisNetworkPlayer LocalPlayer => BasisNetworkManagement.Transmitter as BasisNetworkPlayer;
         public static bool GetPlayerById(ushort allowedPlayer, out BasisNetworkPlayer BasisNetworkPlayer)
         {
-            return BasisNetworkManagement.GetPlayerById(allowedPlayer, out BasisNetworkPlayer);
+           return BasisNetworkPlayers.GetPlayerById(allowedPlayer, out BasisNetworkPlayer);
+        }
+        public static BasisNetworkPlayer GetPlayerById(ushort allowedPlayer)
+        {
+           BasisNetworkPlayers.GetPlayerById(allowedPlayer, out BasisNetworkPlayer BasisNetworkPlayer);
+            return BasisNetworkPlayer;
         }
         public static bool GetPlayerById(int allowedPlayer, out BasisNetworkPlayer BasisNetworkPlayer)
         {
-            return BasisNetworkManagement.GetPlayerById((ushort)allowedPlayer, out BasisNetworkPlayer);
+         return  BasisNetworkPlayers.GetPlayerById((ushort)allowedPlayer, out BasisNetworkPlayer);
+        }
+        public static BasisNetworkPlayer GetPlayerById(int allowedPlayer)
+        {
+           BasisNetworkPlayers.GetPlayerById((ushort)allowedPlayer, out BasisNetworkPlayer BasisNetworkPlayer);
+            return BasisNetworkPlayer;
         }
         /// <summary>
         /// this is slow right now, needs improvement! - dooly
@@ -215,8 +228,8 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         {
             if (hasID)
             {
-                (bool, ushort) output = await BasisNetworkManagement.RequestCurrentOwnershipAsync(IOwnThis);
-                if (output.Item1 && output.Item2 == NetId)
+                BasisOwnershipResult output = await BasisNetworkOwnership.RequestCurrentOwnershipAsync(IOwnThis);
+                if (output.Success && output.PlayerId == playerId)
                 {
                     return true;
                 }
@@ -225,40 +238,36 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         }
         public bool IsOwnerCached(string UniqueNetworkId)
         {
-            if (BasisNetworkManagement.OwnershipPairing.TryGetValue(UniqueNetworkId, out ushort Unique) && NetId == Unique)
-            {
-                return true;
-            }
-            return false;
+            return BasisNetworkOwnership.IsOwnerLocalValidation(UniqueNetworkId);
         }
         public static async Task<bool> IsOwnerLocal(string IOwnThis)
         {
           return  await BasisNetworkPlayer.LocalPlayer.IsOwner(IOwnThis);
         }
 
-        public static async Task<(bool, ushort)> SetOwnerAsync(BasisNetworkPlayer FutureOwner, string IOwnThis)
+        public static async Task<BasisOwnershipResult> SetOwnerAsync(BasisNetworkPlayer FutureOwner, string IOwnThis)
         {
             if (FutureOwner.hasID)
             {
-                return await BasisNetworkManagement.TakeOwnershipAsync(IOwnThis, FutureOwner.NetId);
+                return await BasisNetworkOwnership.TakeOwnershipAsync(IOwnThis, FutureOwner.playerId);
             }
             else
             {
                 return new(false, 0);
             }
         }
-        public static async Task<(bool,ushort)> GetOwnerPlayerIDAsync(string UniqueID)
+        public static async Task<BasisOwnershipResult> GetOwnerPlayerIDAsync(string UniqueID)
         {
-           return await BasisNetworkManagement.RequestCurrentOwnershipAsync(UniqueID);
+           return await BasisNetworkOwnership.RequestCurrentOwnershipAsync(UniqueID);
         }
         public static async Task<(bool, BasisNetworkPlayer)> GetOwnerPlayerAsync(string UniqueID)
         {
-            (bool, ushort) Current = await BasisNetworkManagement.RequestCurrentOwnershipAsync(UniqueID);
-            if (Current.Item1)
+            BasisOwnershipResult Current = await BasisNetworkOwnership.RequestCurrentOwnershipAsync(UniqueID);
+            if (Current.Success)
             {
-                if (BasisNetworkManagement.GetPlayerById(Current.Item2, out BasisNetworkPlayer Player))
+                if (BasisNetworkPlayers.GetPlayerById(Current.PlayerId, out BasisNetworkPlayer Player))
                 {
-                    return new(Current.Item1, Player);
+                    return new(Current.Success, Player);
                 }
             }
             return new(false, null);
@@ -282,7 +291,7 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         {
             if (Player.IsLocal)
             {
-                return BasisLocalPlayer.Instance.LocalAvatarDriver.References.GetBoneLocalPositionRotation(bone, out position, out rotation);
+                return BasisLocalAvatarDriver.References.GetBoneLocalPositionRotation(bone, out position, out rotation);
             }
             else
             {
@@ -297,7 +306,7 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         {
             if (Player.IsLocal)
             {
-                if (BasisLocalPlayer.Instance.LocalBoneDriver.FindBone(out BasisBoneControl Control, Role))
+                if (BasisLocalPlayer.Instance.LocalBoneDriver.FindBone(out BasisLocalBoneControl Control, Role))
                 {
                     position = Control.OutgoingWorldData.position;
                     rotation = Control.OutgoingWorldData.rotation;
@@ -312,7 +321,38 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
             rotation = Quaternion.identity;
             return false;
         }
-
+        public BasisCalibratedCoords GetTrackingData(BasisBoneTrackedRole Role)
+        {
+            if (Player.IsLocal)
+            {
+                if (BasisLocalPlayer.Instance.LocalBoneDriver.FindBone(out BasisLocalBoneControl Control, Role))
+                {
+                    return Control.OutgoingWorldData;
+                }
+            }
+            else
+            {
+                BasisDebug.LogError("Not Implemented Remote GetTrackingData", BasisDebug.LogTag.Networking);
+            }
+            return new BasisCalibratedCoords();
+        }
+        public bool GetTrackingData(BasisBoneTrackedRole Role, out BasisCalibratedCoords outgoing)
+        {
+            if (Player.IsLocal)
+            {
+                if (BasisLocalPlayer.Instance.LocalBoneDriver.FindBone(out BasisLocalBoneControl Control, Role))
+                {
+                    outgoing = Control.OutgoingWorldData;
+                    return true;
+                }
+            }
+            else
+            {
+                BasisDebug.LogError("Not Implemented Remote GetTrackingData", BasisDebug.LogTag.Networking);
+            }
+            outgoing = new BasisCalibratedCoords();
+            return false;
+        }
         /// <summary>
         /// Duration only works on steamvr.
         /// Todo: add openxr duration manual tracking,
@@ -358,12 +398,77 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
             }
         }
 
+        public Vector3 GetPosition()
+        {
+            return Player.BasisAvatar.Animator.rootPosition;
+        }
+
+        public Vector3 GetBonePosition(HumanBodyBones bone)
+        {
+            if (Player.IsLocal)
+            {
+                BasisLocalAvatarDriver.References.GetBonePosition(bone, out Vector3 position);
+                return position;
+            }
+            else
+            {
+                BasisDebug.LogError("Not Implemented Remote GetBonePosition", BasisDebug.LogTag.Networking);
+                return new Vector3();
+            }
+        }
+        public Quaternion GetBoneRotation(HumanBodyBones bone)
+        {
+            if (Player.IsLocal)
+            {
+                BasisLocalAvatarDriver.References.GetBoneRotation(bone, out Quaternion rotation);
+                return rotation;
+            }
+            else
+            {
+                BasisDebug.LogError("Not Implemented Remote GetBonePosition", BasisDebug.LogTag.Networking);
+                return Quaternion.identity;
+            }
+        }
+
+        public static BasisNetworkPlayer[] GetAllPlayers()
+        {
+           return BasisNetworkPlayers.Players.Values.ToArray();
+        }
+
+        public static int GetPlayerCount()
+        {
+            return BasisNetworkPlayers.Players.Count;
+        }
+        public static bool PlayerToName(string name,out BasisNetworkPlayer NetworkPlayer)
+        {
+            foreach(var player in BasisNetworkPlayers.Players.Values)
+            {
+                if(player != null)
+                {
+                    if (player.displayName == name)
+                    {
+                        NetworkPlayer = player;
+                        return true;
+                    }
+                }
+            }
+            NetworkPlayer = null;
+            return false;
+        } 
         /// <summary>
         /// this occurs after the localplayer has been approved by the network and setup
         /// </summary>
         public static Action<BasisNetworkPlayer, BasisLocalPlayer> OnLocalPlayerJoined;
         public static OnNetworkMessageReceiveOwnershipTransfer OnOwnershipTransfer;
         public static OnNetworkMessageReceiveOwnershipRemoved OnOwnershipReleased;
+        /// <summary>
+        /// this occurs after a player has been removed.
+        /// </summary>
+        public static Action<BasisNetworkPlayer> OnPlayerLeft;
+        /// <summary>
+        /// this occurs after a local or remote user has been authenticated and joined & spawned
+        /// </summary>
+        public static Action<BasisNetworkPlayer> OnPlayerJoined;
         /// <summary>
         /// this occurs after a remote user has been authenticated and joined & spawned
         /// </summary>
@@ -376,6 +481,7 @@ namespace Basis.Scripts.Networking.NetworkedAvatar
         /// this occurs after a remote user has removed
         /// </summary>
         public static Action<BasisNetworkPlayer, BasisRemotePlayer> OnRemotePlayerLeft;
+
         public string displayName
         {
             get

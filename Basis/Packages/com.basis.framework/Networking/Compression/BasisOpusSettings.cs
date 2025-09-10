@@ -1,10 +1,10 @@
 using LiteNetLib;
 using OpusSharp.Core;
+using System;
 using UnityEngine;
 
 public static class LocalOpusSettings
 {
-    public const DeliveryMethod AudioSendMethod = DeliveryMethod.Sequenced;
     public static int RecordingFullLength = 1;
     public static OpusPredefinedValues OpusApplication = OpusPredefinedValues.OPUS_APPLICATION_AUDIO;
     public static int MicrophoneSampleRate = 48000;
@@ -18,15 +18,39 @@ public static class LocalOpusSettings
     public static int rmsWindowSize = 10;
     public static void SetDeviceAudioConfig(int maxFreq)
     {
-    //    MicrophoneSampleRate = maxFreq;
+        //    MicrophoneSampleRate = maxFreq;
     }
     public static int SampleRate()
     {
-      return Mathf.CeilToInt(SharedOpusSettings.DesiredDurationInSeconds * MicrophoneSampleRate);
+        return Mathf.CeilToInt(SharedOpusSettings.DesiredDurationInSeconds * MicrophoneSampleRate);
     }
-    public static float[] CalculateProcessBuffer()
+    public static void EnsureProcessBuffer(ref float[] Processed, out int ProcessBufferLength)
     {
-        return new float[SampleRate()];
+        ProcessBufferLength = SampleRate(); // Protect against negative sizes
+
+        if (Processed == null)
+        {
+            Processed = new float[ProcessBufferLength];
+            return;
+        }
+
+        if (Processed.Length != ProcessBufferLength)
+        {
+            Array.Resize(ref Processed, ProcessBufferLength);
+        }
+    }
+    public static void CreateOrResizeArray(int Input,ref float[] Processed)
+    {
+        if (Processed == null)
+        {
+            Processed = new float[Input];
+            return;
+        }
+
+        if (Processed.Length != Input)
+        {
+            Array.Resize(ref Processed, Input);
+        }
     }
 }
 public static class SharedOpusSettings
@@ -38,7 +62,6 @@ public static class RemoteOpusSettings
     public static OpusPredefinedValues OpusApplication = OpusPredefinedValues.OPUS_APPLICATION_AUDIO;
 
     public const int NetworkSampleRate = 48000;
-    public static int PlayBackSampleRate = AudioSettings.outputSampleRate;
     /// <summary>
     /// we only ever need one channel
     /// </summary>

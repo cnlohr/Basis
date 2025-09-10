@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright 2017-2023 Valve Corporation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -281,10 +281,11 @@ namespace SteamAudio
             var listener = SteamAudioManager.GetSteamAudioListener();
 
             var inputs = new SimulationInputs { };
-            inputs.source.origin = Common.ConvertVector(transform.position);
-            inputs.source.ahead = Common.ConvertVector(transform.forward);
-            inputs.source.up = Common.ConvertVector(transform.up);
-            inputs.source.right = Common.ConvertVector(transform.right);
+            var t = transform;
+            inputs.source.origin = Common.ConvertVector(t.position);
+            inputs.source.ahead = Common.ConvertVector(t.forward);
+            inputs.source.up = Common.ConvertVector(t.up);
+            inputs.source.right = Common.ConvertVector(t.right);
 
             if (mSettings.audioEngine == AudioEngineType.Unity &&
                 distanceAttenuation &&

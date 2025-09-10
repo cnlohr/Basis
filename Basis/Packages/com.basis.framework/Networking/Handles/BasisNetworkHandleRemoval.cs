@@ -1,46 +1,88 @@
+using Basis.Scripts.Avatar;
 using Basis.Scripts.Networking;
 using Basis.Scripts.Networking.NetworkedAvatar;
 using UnityEngine;
+
 public static class BasisNetworkHandleRemoval
 {
     public static void HandleDisconnection(LiteNetLib.NetPacketReader reader)
     {
-        if (reader.TryGetUShort(out ushort DisconnectValue))
+        while (reader.AvailableBytes >= sizeof(ushort))
         {
-            BasisDebug.Log($"trying to remove Networked Player {DisconnectValue}");
-            if (BasisNetworkManagement.Players.TryGetValue(DisconnectValue, out BasisNetworkPlayer NetworkedPlayer))
+            if (!reader.TryGetUShort(out ushort disconnectValue))
             {
-                if (NetworkedPlayer.Player.IsLocal == false)
-                {
-                    BasisNetworkManagement.RemovePlayer(DisconnectValue);//detach from sequences
-                    BasisNetworkManagement.MainThreadContext.Post(_ =>
-                    {
-                        BasisNetworkPlayer.OnRemotePlayerLeft?.Invoke(NetworkedPlayer, (Basis.Scripts.BasisSdk.Players.BasisRemotePlayer)NetworkedPlayer.Player);//tell scripts delete time
-                        NetworkedPlayer.DeInitialize();//shutdown the networking
-                        if (NetworkedPlayer.Player.BasisAvatar != null)//nuke avatar first
-                        {
-                            GameObject.Destroy(NetworkedPlayer.Player.BasisAvatar.gameObject);
-                        }
-                        if (NetworkedPlayer.Player != null)//remove the player
-                        {
-                            GameObject.Destroy(NetworkedPlayer.Player.gameObject);
-                        }
+                BasisDebug.LogError("Tried to read disconnect message but data was missing!");
+                break;
+            }
 
-                    }, null);
-                }
-                else
-                {
-                    BasisDebug.LogError("network used wrong api to remove local player!");
-                }
+            HandleDisconnectId(disconnectValue);
+        }
+    }
+
+    public static void HandleDisconnectId(ushort disconnectedID)
+    {
+        if (disconnectedID == BasisNetworkPlayer.LocalPlayer.playerId)
+        {
+            BasisDebug.LogError("LocalPlayer Matched Disconnected ID returning early");
+            return;
+        }
+
+        // Queue removal on Unity's main thread
+        BasisNetworkManagement.MainThreadContext.Post(_ =>
+        {
+            HandleDisconnectIdImmediate(disconnectedID);
+        }, null);
+    }
+
+    public static void HandleDisconnectIdImmediate(ushort disconnectedID)
+    {
+        if (disconnectedID == BasisNetworkPlayer.LocalPlayer.playerId)
+        {
+            BasisDebug.LogError("LocalPlayer Matched Disconnected ID returning early");
+            return;
+        }
+
+        // Remove from network manager
+        if (BasisNetworkPlayers.RemovePlayer(disconnectedID, out BasisNetworkPlayer network))
+        {
+            if (network == null)
+            {
+                BasisDebug.LogError($"Missing Networked Player for removing ID {disconnectedID}");
+                return;
+            }
+
+            // Notify scripts about remote player leaving
+            if (network.Player != null)
+            {
+                BasisNetworkPlayer.OnRemotePlayerLeft?.Invoke(network, (Basis.Scripts.BasisSdk.Players.BasisRemotePlayer)network.Player);
             }
             else
             {
-                BasisDebug.LogError("Removal Requested but no one was found with id " + DisconnectValue);
+                BasisDebug.LogError($"Missing Player for removing ID {disconnectedID}");
+            }
+            BasisNetworkPlayer.OnPlayerLeft?.Invoke(network);
+
+            // Shutdown networking
+            network.DeInitialize();
+
+            if (network.Player != null)
+            {
+                BasisAvatarFactory.DeleteLastAvatar(network.Player);
+            }
+            else
+            {
+                BasisDebug.LogError($"B Missing Player for removing ID {disconnectedID}");
+            }
+
+            // Destroy the player GameObject
+            if (network.Player != null)
+            {
+                GameObject.Destroy(network.Player.gameObject);
             }
         }
         else
         {
-            BasisDebug.LogError("Tried To Read Disconnect Message Missing Data!");
+            BasisDebug.LogError($"C Missing Player for removing ID {disconnectedID}");
         }
     }
 }

@@ -56,7 +56,7 @@ namespace Basis.Network.Server.Auth
             // Compare strings with explicit options
             if (string.Equals(serverPassword.V, userPassword.V, StringComparison.Ordinal))
             {
-                BNL.Log("Passwords match successfully.");
+              //  BNL.Log("Passwords match successfully.");
                 return true;
             }
             else

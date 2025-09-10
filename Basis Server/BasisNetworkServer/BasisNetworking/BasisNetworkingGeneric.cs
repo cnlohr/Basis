@@ -3,6 +3,7 @@ using BasisNetworkCore;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using System.Collections.Generic;
+using System.Linq;
 using static SerializableBasis;
 
 namespace Basis.Network.Server.Generic
@@ -42,10 +43,9 @@ namespace Basis.Network.Server.Generic
                 //  BNL.Log("Query Recipients " + recipientsLength);
                 for (int index = 0; index < recipientsLength; index++)
                 {
-                    NetPeer client = NetworkServer.chunkedNetPeerArray.GetPeer(SceneDataMessage.recipients[index]);
-                    if (client != null)
+                    if (NetworkServer.AuthenticatedPeers.TryGetValue(SceneDataMessage.recipients[index], out NetPeer client))
                     {
-                     //   BNL.Log("Found Peer! " + SceneDataMessage.recipients[index]);
+                        //   BNL.Log("Found Peer! " + SceneDataMessage.recipients[index]);
                         targetedClients.Add(client);
                     }
                     else
@@ -57,13 +57,15 @@ namespace Basis.Network.Server.Generic
                 if (targetedClients.Count > 0)
                 {
                     //  BNL.Log("Sending out Target Clients " + targetedClients.Count);
-                    NetworkServer.BroadcastMessageToClients(Writer, Channel,ref targetedClients, DeliveryMethod);
+                    NetworkServer.BroadcastMessageToClients(Writer, Channel, ref targetedClients, DeliveryMethod);
                 }
             }
             else
             {
-                NetworkServer.BroadcastMessageToClients(Writer, Channel, sender,BasisPlayerArray.GetSnapshot(), DeliveryMethod);
+                NetPeer[] peers = NetworkServer.AuthenticatedPeers.Values.ToArray();
+                NetworkServer.BroadcastMessageToClients(Writer, Channel, sender, peers, DeliveryMethod);
             }
+            serverSceneDataMessage.sceneDataMessage.Release();
         }
         public static void HandleAvatar(NetPacketReader Reader, DeliveryMethod DeliveryMethod, NetPeer sender)
         {
@@ -76,7 +78,8 @@ namespace Basis.Network.Server.Generic
                 {
                     messageIndex = avatarDataMessage.messageIndex,
                     payload = avatarDataMessage.payload,
-                    PlayerIdMessage = avatarDataMessage.PlayerIdMessage
+                    PlayerIdMessage = avatarDataMessage.PlayerIdMessage,
+                    AvatarLinkIndex = avatarDataMessage.AvatarLinkIndex,
                 },
                 playerIdMessage = new PlayerIdMessage
                 {
@@ -99,8 +102,7 @@ namespace Basis.Network.Server.Generic
                 //  BNL.Log("Query Recipients " + recipientsLength);
                 for (int index = 0; index < recipientsLength; index++)
                 {
-                    NetPeer client = NetworkServer.chunkedNetPeerArray.GetPeer(avatarDataMessage.recipients[index]);
-                    if (client != null)
+                    if (NetworkServer.AuthenticatedPeers.TryGetValue(avatarDataMessage.recipients[index], out NetPeer client))
                     {
                         //   BNL.Log("Found Peer! " + SceneDataMessage.recipients[index]);
                         targetedClients.Add(client);
@@ -114,12 +116,13 @@ namespace Basis.Network.Server.Generic
                 if (targetedClients.Count > 0)
                 {
                     //BNL.Log("Sending out Target Clients " + targetedClients.Count);
-                    NetworkServer.BroadcastMessageToClients(Writer, Channel,ref targetedClients, DeliveryMethod);
+                    NetworkServer.BroadcastMessageToClients(Writer, Channel, ref targetedClients, DeliveryMethod);
                 }
             }
             else
             {
-                NetworkServer.BroadcastMessageToClients(Writer, Channel, sender, BasisPlayerArray.GetSnapshot(), DeliveryMethod);
+                NetPeer[] peers = NetworkServer.AuthenticatedPeers.Values.ToArray();
+                NetworkServer.BroadcastMessageToClients(Writer, Channel, sender, peers, DeliveryMethod);
             }
         }
     }

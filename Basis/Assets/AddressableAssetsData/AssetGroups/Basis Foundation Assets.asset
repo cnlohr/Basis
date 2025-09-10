@@ -15,18 +15,8 @@ MonoBehaviour:
   m_GroupName: Basis Foundation Assets
   m_GUID: 37c75a6cf72db324eb01200602299fc8
   m_SerializeEntries:
-  - m_GUID: 04d8d7db6114a384aaabeb1d02dd2013
-    m_Address: Packages/com.hecomi.ulipsync/Assets/Profiles/uLipSync-Profile-Sample-Female.asset
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 06b1965d0565c4444b4ce3ea5aa8e690
     m_Address: Packages/com.basis.tests/Mirror/BasisSDKMIrror.prefab
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0beeb56a431ea1646bb55ff6c6fc5a62
-    m_Address: Packages/com.hecomi.ulipsync/Assets/Profiles/uLipSync-Profile-Sample.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -35,28 +25,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 18406c2d98a4b874e9ccd06d2741d401
-    m_Address: vr_tracker_vive_3_0
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1a876a9e9a22e4643b0d03f0eb3d0c30
     m_Address: Locomotion
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1c4eb22ae1b895b4999f192628cd9cdb
-    m_Address: oculus_cv1_controller_right
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 213ae8df071a2ec42a9f405d5b3e0b62
-    m_Address: oculus_cv1_controller_left
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 26ade42e4ff7eb64eb194e1a6453ad85
-    m_Address: NetworkManagement
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -81,7 +51,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3a3df1983396db742b32634900a6e4ad
-    m_Address: BootManager
+    m_Address: BasisFramework
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -105,11 +75,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 411cf3d73f4e3dc46a7ae9e13da44f03
-    m_Address: oculus_quest_pro_controller_right
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 42ead3513149d52499d31b37cb1530ec
     m_Address: BasisUIAddAvatar
     m_ReadOnly: 0
@@ -127,11 +92,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4b6d450b11ad8974e8c4ba0b1e0df50e
     m_Address: RemotePlayer
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4c139b2f91b0dc9448dca7fcc1b6f1e6
-    m_Address: oculus_quest2_controller_left
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -155,13 +115,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 664b0a1856405914186fc25229d9d893
-    m_Address: vr_tracker_vive_1_0
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 6cdbeef6535327d40a6f7839159facff
-    m_Address: oculus_quest_controller_left
+  - m_GUID: 68c19bcf0d450994caac14b3bc546184
+    m_Address: BasisUIServers
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -170,13 +125,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 86272a90b30fb814ea93537106bd9c2c
-    m_Address: valve_controller_knu_right
+  - m_GUID: 938a74e0852c65a46b1e41fd00424827
+    m_Address: Packages/com.basis.gizmos/GizmoShader.shadergraph
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 938a74e0852c65a46b1e41fd00424827
-    m_Address: Packages/com.basis.gizmos/GizmoShader.shadergraph
+  - m_GUID: 93e1db65c6ab98040aeed79fd3ee335b
+    m_Address: Packages/com.basis.sdk/Prefabs/Players/AudioSource.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -225,8 +180,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c48a4804c2b9e8e4ba8c9ea8aab07a1e
-    m_Address: valve_controller_knu_left
+  - m_GUID: c1e44be3809ebf446b1c38479ca9d1ed
+    m_Address: Packages/com.basis.sdk/Prefabs/UI/ControllerConfig.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -235,28 +190,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: cdff6bc74faea65489485131ad236623
-    m_Address: oculus_quest_plus_controller_left
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d736adbd5f9ea3441922acf7da4225c3
-    m_Address: oculus_quest_plus_controller_right
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d7624434af8aa17488fd698eabbf2bb6
-    m_Address: oculus_quest2_controller_right
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dd1db054b177db7459cc81633b86e525
     m_Address: Assets/Scenes/initialization.unity
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e7bee847b0146493d97aceaf14bb2903
-    m_Address: Packages/com.hecomi.ulipsync/Assets/Profiles/uLipSync-Profile-Sample-Male.asset
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -280,18 +215,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f95798865974f0740a6932a53740011f
-    m_Address: oculus_quest_controller_right
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fc769e29146b5b34583aa23bb7d1a2b5
-    m_Address: tundra_tracker
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: fd12decbd8eb25048853cfde62e68f90
-    m_Address: oculus_quest_pro_controller_left
+  - m_GUID: f84144c055f881f4797d59bd2802d4a4
+    m_Address: Packages/com.basis.sdk/Prefabs/Boot/BasisOnSceneLoadCleanup.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

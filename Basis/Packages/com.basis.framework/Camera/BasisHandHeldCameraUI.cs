@@ -7,7 +7,10 @@ using UnityEngine;
 using UnityEngine.UI;
 using Basis.Scripts.UI.UI_Panels;
 
+public enum CameraOrientation { Landscape, Portrait }
+
 [System.Serializable]
+
 public class BasisHandHeldCameraUI
 {
     public Button TakePhotoButton;
@@ -16,12 +19,13 @@ public class BasisHandHeldCameraUI
     public Button Timer;
     public Button Nameplates;
     public Button OverrideDesktopOutput;
+    public Button Selfie;
     [Space(10)]
     public GameObject focusCursor;
     public Button DepthModeAutoButton;
     public Button DepthModeManualButton;
     public enum DepthMode { Auto, Manual }
-    private DepthMode currentDepthMode = DepthMode.Auto;
+    public DepthMode currentDepthMode = DepthMode.Auto;
     [Space(10)]
     public Toggle Resolution;
     public GameObject[] ResolutionSprites; // 4 resolution sprites
@@ -32,6 +36,8 @@ public class BasisHandHeldCameraUI
     private const int FORMAT_EXR = 1;
     public GameObject PngSprite; // Sprite 1
     public GameObject ExrSprite; // Sprite 2
+    public GameObject DoFAutoSprite;
+    public GameObject DoFManualSprite;
     [Space(10)]
     public Slider ExposureSlider;
     private float[] exposureStops = new float[] { -3f, -2.5f, -2f, -1.5f, -1f, -0.5f, 0f, 0.5f, 1f, 1.5f, 2f, 2.5f, 3f };
@@ -52,6 +58,14 @@ public class BasisHandHeldCameraUI
     public Slider ContrastSlider;
     public Slider SaturationSlider;
     [Space(10)]
+    public RectTransform uiOrientationElement;
+    public RectTransform uiOrientationElement2;
+    public RectTransform uiOrientationElement3;
+    public RectTransform uiOrientationElement4;
+    public RectTransform uiOrientationElement5;
+    [Space(10)]
+    public GameObject cameraReference;
+    private bool selfie = false;
     public BasisHandHeldCamera HHC;
     public async Task Initialize(BasisHandHeldCamera hhc)
     {
@@ -81,7 +95,7 @@ public class BasisHandHeldCameraUI
         Nameplates?.onClick.AddListener(HHC.Nameplates);
         OverrideDesktopOutput?.onClick.AddListener(HHC.OnOverrideDesktopOutputButtonPress);
         CloseButton?.onClick.AddListener(CloseUI);
-
+        Selfie?.onClick.AddListener(SelfieToggle);
         Resolution?.onValueChanged.AddListener(OnResolutionToggleChanged);
         Format?.onValueChanged.AddListener(OnFormatToggleChanged);
 
@@ -127,16 +141,70 @@ public class BasisHandHeldCameraUI
     {
         FOVSlider.value = HHC.captureCamera.fieldOfView;
     }
+    public void SetUIOrientation(CameraOrientation orientation)
+    {
+        if (uiOrientationElement == null)
+        {
+            BasisDebug.LogError("[Camera UI] uiOrientationElement is NULL! Did you forget to assign it in the Inspector?");
+            return;
+        }
 
-    private void SetDepthMode(DepthMode mode)
+        bool isPortrait = orientation == CameraOrientation.Portrait;
+
+        uiOrientationElement.localRotation = isPortrait
+            ? Quaternion.Euler(0f, 0f, -90f)
+            : Quaternion.identity;
+        uiOrientationElement.localPosition = isPortrait
+            ? new Vector3(-525f, 0f, 0f)
+            : Vector3.zero;
+
+        uiOrientationElement2.localRotation = isPortrait
+            ? Quaternion.Euler(0f, 0f, -90f)
+            : Quaternion.identity;
+        uiOrientationElement2.localPosition = isPortrait
+            ? new Vector3(-500f, 0f, 0f)
+            : Vector3.zero;
+
+        uiOrientationElement3.localRotation = isPortrait
+            ? Quaternion.Euler(0f, 0f, -90f)
+            : Quaternion.identity;
+        uiOrientationElement3.localPosition = isPortrait
+            ? new Vector3(1050f, 0f, 0f)
+            : new Vector3(0f, 600f, 0f);
+
+        uiOrientationElement4.localRotation = isPortrait
+            ? Quaternion.Euler(0f, 0f, 0f)
+            : Quaternion.Euler(0f, 0f, 90f);
+        uiOrientationElement4.localPosition = isPortrait
+            ? new Vector3(0f, -725f, 0f)
+            : new Vector3(1250f, 0f, 0f);
+
+        uiOrientationElement5.localRotation = isPortrait
+            ? Quaternion.Euler(0f, 0f, -90f)
+            : Quaternion.Euler(0f, 0f, 0f);
+        uiOrientationElement5.localPosition = isPortrait
+            ? new Vector3(0f, -525f, 0f)
+            : new Vector3(0f, 0f, 0f);
+    }
+    private void SelfieToggle()
+    {
+        cameraReference.transform.rotation *= Quaternion.Euler(0, 180, 0);
+        selfie = !selfie;
+    }
+    public void SetDepthMode(DepthMode mode)
     {
         currentDepthMode = mode;
 
         bool useAuto = (mode == DepthMode.Auto);
+        bool dofIsActive = HHC.MetaData.depthOfField.active;
 
-        focusCursor?.SetActive(HHC.MetaData.depthOfField.active);
-        DepthApertureSlider.gameObject.SetActive(true);
-        DepthFocusDistanceSlider.gameObject.SetActive(!useAuto);
+        focusCursor?.SetActive(dofIsActive);
+
+        DepthApertureSlider.gameObject.SetActive(dofIsActive); // Only show if DoF is active
+        DepthFocusDistanceSlider.gameObject.SetActive(dofIsActive && !useAuto); // Only in Manual mode
+
+        if (DoFAutoSprite != null) DoFAutoSprite.SetActive(dofIsActive && useAuto);
+        if (DoFManualSprite != null) DoFManualSprite.SetActive(dofIsActive && !useAuto);
 
         BasisDebug.Log($"[DepthMode] Switched to {(useAuto ? "Auto" : "Manual")}");
     }
@@ -183,7 +251,6 @@ public class BasisHandHeldCameraUI
                 ResolutionSprites[i].SetActive(i == currentResolutionIndex);
         }
     }
-
     public int GetFormatIndex()
     {
         return Format != null && Format.isOn ? FORMAT_EXR : FORMAT_PNG;
@@ -194,8 +261,12 @@ public class BasisHandHeldCameraUI
         {
             BasisHamburgerMenu.activeCameraInstance = null;
         }
+        var cameraInteractable = HHC.GetComponent<BasisHandHeldCameraInteractable>();
+        if (cameraInteractable != null)
+            cameraInteractable.ReleasePlayerLocks();
 
         GameObject.Destroy(HHC.gameObject);
+        Cursor.visible = false;
     }
 
     public const string CameraSettingsJson = "CameraSettings.json";

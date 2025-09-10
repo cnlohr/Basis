@@ -99,9 +99,9 @@ namespace Basis.Network.Server
                     {
                         if (  NetworkServer.Configuration.EnableStatistics )
                         {
-			    int ServerCount = NetworkServer.server.ConnectedPeersCount; // Current user count
-			    long sent = NetworkServer.server.Statistics.BytesSent; 
-			    long recv = NetworkServer.server.Statistics.BytesReceived;
+			    int ServerCount = NetworkServer.Server.ConnectedPeersCount; // Current user count
+			    long sent = NetworkServer.Server.Statistics.BytesSent; 
+			    long recv = NetworkServer.Server.Statistics.BytesReceived;
 			    int capacity = NetworkServer.Configuration.PeerLimit;
 			    DateTime accessed = DateTime.Now;
 

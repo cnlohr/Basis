@@ -13,7 +13,7 @@ The Social VR Framework</br>
 
  ## About Basis
 
-[Basis Philosophy](./PHILOSOPHY.md) <- read our Philosophy here!
+[Basis Philosophy](https://basisvr.org/philosophy) <- read our Philosophy here!
 
 We are a MIT-Licensed Open-Source project with a focus on open development and full access to any optional modification desired or required.
 
@@ -21,7 +21,7 @@ Our goal is to help equip VR Creators, so we can accelerate the growth of VR.
 
 <img src="./Basis/Images/Banner.png" alt="Banner" width="550" height="155">
 
-We are actively working on Basis. If you like what you see please consider contributing to the github in any way you can.
+We are actively working on Basis. If you like what you see, please consider contributing to the github in any way you can.
 
  ## How you can Contribute
 
@@ -37,23 +37,24 @@ Please help shape the future of Basis and leave your mark on its foundation.
  #### Creating a Fork
 
 1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/ACrazyNewFeature`)
-3. Commit your Changes (`git commit -m 'Add some ACrazyNewFeature'`)
-4. Push to the Branch (`git push origin feature/ACrazyNewFeature`)
-5. Open a Pull Request
+2. Optionally, [Setup CI Secrets](./CI.md).
+3. Create your Feature Branch (`git checkout -b feature/ACrazyNewFeature`)
+4. Commit your Changes (`git commit -m 'Add some ACrazyNewFeature'`)
+5. Push to the Branch (`git push origin feature/ACrazyNewFeature`)
+6. Open a Pull Request
 
  ## Installation
 
-This project is currently using Unity 6 (6000.0.44f1)
-Other Unity versions may work but will require changes and adaptations.
-Currently, OPENXR and SteamVR are supported as well as OPENXR Quest.
+This project is currently using Unity 6 (6000.2.1f1)
+Other Unity versions may work, but will require changes and adaptations.
+Currently, OPENXR and SteamVR are supported, as well as OPENXR Quest.
 
 1. Make sure you have the correct Unity version installed.
 2. Clone the repository
    ```sh
    git clone https://github.com/BasisVR/Basis.git
    ```
-3. Open the project and make sure to load the scene Initialization
+3. Open the project and make sure to load the scene Initialisation
 4. Enter play!
 
  ## Contact
@@ -78,10 +79,8 @@ This would not be possible without the following:
 - [UnityJigglePhysics](https://github.com/naelstrof/UnityJigglePhysics)
 - [opussharp](https://github.com/AvionBlock/OpusSharp)
 - [opus](https://github.com/xiph/opus)
-- [Settings Manager](https://assetstore.unity.com/packages/tools/gui/settings-manager-158458)
 - [Steam Audio](https://github.com/ValveSoftware/steam-audio)
 - [Kevin Iglesias Animations](https://www.keviniglesias.com/)
-- [audiolink](https://github.com/llealloo/audiolink/)
 - [Unity Starter Assets - ThirdPerson](https://assetstore.unity.com/packages/essentials/starter-assets-thirdperson-updates-in-new-charactercontroller-pa-196526)
 - [Aurellia](https://github.com/CascadianVR) Assets\third_party\Avatar\Aurellia\LICENSE
 - [YUN](https://github.com/yewnyx) Assets\third_party\Avatar\Yun\LICENSE
@@ -90,6 +89,7 @@ This would not be possible without the following:
 - [RNNoise.Net](https://github.com/Yellow-Dog-Man/RNNoise.Net)
 - [unity](https://unity.com/)
 - [ionic icons](https://github.com/ionic-team/ionicons?ref=svgrepo.com)
+- [LiteNetLib](https://github.com/RevenantX/LiteNetLib)
 
 
 ## Third-Party Code and Trademarks

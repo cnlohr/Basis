@@ -1,6 +1,6 @@
 using Basis.Scripts.BasisSdk.Players;
+using Basis.Scripts.Drivers;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Basis.Scripts.Device_Management.Devices.Desktop
@@ -9,43 +9,40 @@ namespace Basis.Scripts.Device_Management.Devices.Desktop
     public class BasisDesktopManagement : BasisBaseTypeManagement
     {
         public BasisAvatarEyeInput BasisAvatarEyeInput;
-        public override void BeginLoadSDK()
+        public const string DesktopEye = "Desktop Eye";
+        public override void StartSDK()
         {
             if (BasisAvatarEyeInput == null)
             {
-                BasisDeviceManagement.Instance.SetCameraRenderState(false);
-                BasisDeviceManagement.CurrentMode = BasisDeviceManagement.Desktop;
-                GameObject gameObject = new GameObject("Desktop Eye");
+                BasisLocalCameraDriver.AllowXRRenderering(false);
+                GameObject gameObject = new GameObject(DesktopEye);
                 if (BasisLocalPlayer.Instance != null)
                 {
                     gameObject.transform.parent = BasisLocalPlayer.Instance.transform;
                 }
                 BasisAvatarEyeInput = gameObject.AddComponent<BasisAvatarEyeInput>();
-                BasisAvatarEyeInput.Initialize("Desktop Eye", nameof(BasisDesktopManagement));
+                BasisAvatarEyeInput.Initialize(DesktopEye, nameof(BasisDesktopManagement));
                 BasisDeviceManagement.Instance.TryAdd(BasisAvatarEyeInput);
             }
-        }
-
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        public override void StartSDK()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-        {
+            BasisCursorManagement.LockCursor(nameof(BasisAvatarEyeInput));
         }
         public override void StopSDK()
         {
-            if (BasisDeviceManagement.Instance.TryFindBasisBaseTypeManagement("SimulateXR", out List<BasisBaseTypeManagement> Matched))
+            BasisDeviceManagement.Instance.RemoveDevicesFrom(nameof(BasisDesktopManagement), DesktopEye);
+            if(BasisAvatarEyeInput != null)
             {
-                foreach (var m in Matched)
-                {
-                    m.StopSDK();
-                }
+                GameObject.Destroy(BasisAvatarEyeInput);
             }
-            BasisDeviceManagement.Instance.RemoveDevicesFrom(nameof(BasisDesktopManagement), "Desktop Eye");
+            BasisAvatarEyeInput.Instance = null;
+            BasisAvatarEyeInput = null;
         }
-
-        public override string Type()
+        public override bool IsDeviceBootable(string BootRequest)
         {
-            return BasisDeviceManagement.Desktop;
+            if (BootRequest == BasisConstants.Desktop)
+            {
+                return true;
+            }
+            return false;
         }
     }
 }

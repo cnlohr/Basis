@@ -8,11 +8,9 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
 using UnityEngine.SceneManagement;
 using static BundledContentHolder;
 using static SerializableBasis;
-
 public static class BasisNetworkSpawnItem
 {
     public static bool RequestSceneLoad(string UnlockPassword, string CombinedURL, bool Persist, out LocalLoadResource localLoadResource)
@@ -40,7 +38,7 @@ public static class BasisNetworkSpawnItem
 
         BasisDebug.Log($"Sending scene load request with NetID: {localLoadResource.LoadedNetID}", BasisDebug.LogTag.Networking);
 
-        BasisNetworkManagement.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.LoadResourceMessage, LiteNetLib.DeliveryMethod.ReliableOrdered);
+        BasisNetworkConnection.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.LoadResourceChannel, LiteNetLib.DeliveryMethod.ReliableOrdered);
         return true;
     }
 
@@ -80,7 +78,7 @@ public static class BasisNetworkSpawnItem
 
         BasisDebug.Log($"Sending GameObject load request with NetID: {LocalLoadResource.LoadedNetID}", BasisDebug.LogTag.Networking);
 
-        BasisNetworkManagement.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.LoadResourceMessage, LiteNetLib.DeliveryMethod.ReliableOrdered);
+        BasisNetworkConnection.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.LoadResourceChannel, LiteNetLib.DeliveryMethod.ReliableOrdered);
         return true;
     }
 
@@ -123,7 +121,7 @@ public static class BasisNetworkSpawnItem
 
         BasisDebug.Log($"Sending unload request with NetID: {UnLoadResource.LoadedNetID}", BasisDebug.LogTag.Networking);
 
-        BasisNetworkManagement.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.UnloadResourceMessage, LiteNetLib.DeliveryMethod.ReliableOrdered);
+        BasisNetworkConnection.LocalPlayerPeer?.Send(writer, BasisNetworkCommons.UnloadResourceChannel, LiteNetLib.DeliveryMethod.ReliableOrdered);
     }
 
     public static async Task<Scene> SpawnScene(LocalLoadResource localLoadResource)
@@ -139,7 +137,7 @@ public static class BasisNetworkSpawnItem
             UnlockPassword = localLoadResource.UnlockPassword,
         };
 
-        Scene scene = await BasisSceneLoadDriver.LoadSceneAssetBundle(loadBundle);
+        Scene scene = await BasisSceneLoad.LoadSceneAssetBundle(loadBundle);
         BasisDebug.Log($"LoadSceneAssetBundle Complete now Starting Scene Traversal", BasisDebug.LogTag.Networking);
         SceneTraverseNetIdAssign(scene, localLoadResource);
         SpawnedScenes.TryAdd(localLoadResource.LoadedNetID, scene);
@@ -154,7 +152,7 @@ public static class BasisNetworkSpawnItem
             BasisScene BasisScene = root.GetComponentInChildren<BasisScene>();
             if (BasisScene != null)
             {
-                BasisScene.NetworkID = localLoadResource.LoadedNetID;
+                BasisScene.AssignNetworkGUIDIdentifier(localLoadResource.LoadedNetID);
                 return;
             }
         }
@@ -179,9 +177,15 @@ public static class BasisNetworkSpawnItem
             new Vector3(localLoadResource.ScaleX, localLoadResource.ScaleY, localLoadResource.ScaleZ),
             localLoadResource.ModifyScale, Selector, BasisNetworkManagement.Instance.transform);
 
-        if (reference.TryGetComponent<BasisContentBase>(out BasisContentBase BasisContentBase))
+        if (reference == null)
         {
-            BasisContentBase.NetworkID = localLoadResource.LoadedNetID;
+            BasisDebug.LogError($"Unable to load {loadBundle.BasisLocalEncryptedBundle.DownloadedBeeFileLocation}", BasisDebug.LogTag.Networking);
+            BasisProgressReport.OnProgressReport -= BasisUILoadingBar.ProgressReport;
+            return null;
+        }
+        if (reference.TryGetComponent<BasisNetworkContentBase>(out BasisNetworkContentBase BasisContentBase))
+        {
+            BasisContentBase.AssignNetworkGUIDIdentifier(localLoadResource.LoadedNetID);
         }
         SpawnedGameobjects.TryAdd(localLoadResource.LoadedNetID, reference);
         BasisProgressReport.OnProgressReport -= BasisUILoadingBar.ProgressReport;

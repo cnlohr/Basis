@@ -478,6 +478,11 @@ MonoBehaviour:
   hasLocalCreationEvent: 0
   Position: {x: 0, y: 0, z: 0}
   Rotation: {x: 0, y: 0, z: 0, w: 0}
+  SnapToPlayOnDistance: 0
+  MaxDistanceInVRBeforeSnap: 4
+  CurrentMaxDistanceInVRBeforeSnap: 0
+  CurrentDistanceToVR: 0
+  targetPosition: {x: 0, y: 0, z: 0}
 --- !u!114 &6238232199919162506
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -491,7 +496,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Text: {fileID: 6269084224179822560}
-  Driver: {fileID: 854108928976222872}
+  BasisUIMovementDriver: {fileID: 854108928976222872}
 --- !u!1 &7037479454905910837
 GameObject:
   m_ObjectHideFlags: 0

@@ -12,28 +12,24 @@ public class Configuration
     public const string InitialResourcesFolderName = "initialresources";
     public int PeerLimit = 1024;
     public ushort SetPort = 4296;
-    public int QueueEvents = 10;
     public bool UseNativeSockets = true;
     public bool NatPunchEnabled = true;
     public int PingInterval = 1500;
-    public int DisconnectTimeout = 5000;
+    public int DisconnectTimeout = 15000;
     public bool SimulatePacketLoss = false;
     public bool SimulateLatency = false;
     public int SimulationPacketLossChance = 10;
     public int SimulationMinLatency = 50;
     public int SimulationMaxLatency = 150;
-    public bool UnsyncedEvents = false;
-    public bool UnsyncedReceiveEvent = false;
-    public bool UnsyncedDeliveryEvent = false;
     public int ReconnectDelay = 500;
     public int MaxConnectAttempts = 10;
-    public bool ReuseAddress = true;
+    public bool ReuseAddress = false;
     public bool DontRoute = false;
     public bool EnableStatistics = true;
     public bool IPv6Enabled = true;
-    public int MtuOverride = 1500;
-    public bool MtuDiscovery = true;
-    public bool DisconnectOnUnreachable = true;
+    public int MtuOverride = 0;
+    public bool MtuDiscovery = false;
+    public bool DisconnectOnUnreachable = false;
     public bool AllowPeerAddressChange = true;
     public bool HasFileSupport = true;
     public string HealthCheckHost = "localhost";
@@ -42,20 +38,19 @@ public class Configuration
     public int BSRSMillisecondDefaultInterval = 50;
     public int BSRBaseMultiplier = 1;
     public float BSRSIncreaseRate = 0.005f;
+    public float BSRSlowestSendRate = 2.55f;
     public bool OverrideAutoDiscoveryOfIpv = false;
     public string IPv4Address = "0.0.0.0";
     public string IPv6Address = "::1";
-    public int PromethusPort = 1234;
-    public string PromethusUrl = "/metrics";
     public string Password = "default_password";
-    public int MinThreadPoolThreads = 100;
-    public int MaxThreadPoolThreads = 500;
     public bool UseAuth = true;
     public bool UseAuthIdentity = true;
     public BasisUserRestrictionMode BasisUserRestrictionMode;
     public int HowManyDuplicateAuthCanExist = 2;
     public int AuthValidationTimeOutMiliseconds = 9000;
     public bool EnableConsole = true;
+    public bool DisableWriteUnlessAdminPersistentFlag = true;
+    public bool DisableReadUnlessAdminPersistentFlag = false;
     /// <summary>
     /// Read config from file. If no file is found create a default config file at filePath
     /// </summary>

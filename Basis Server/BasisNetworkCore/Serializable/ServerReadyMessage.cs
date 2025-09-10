@@ -3,7 +3,7 @@ public static partial class SerializableBasis
 {
     public struct ServerReadyMessage
     {
-        public PlayerIdMessage playerIdMessage;
+        public PlayerIdMessage playerIdMessage;//who this came from
         public ReadyMessage localReadyMessage;
         public void Deserialize(NetDataReader Writer)
         {

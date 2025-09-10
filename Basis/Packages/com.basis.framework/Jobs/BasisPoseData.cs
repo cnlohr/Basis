@@ -1,26 +1,25 @@
 using UnityEngine;
-
 [System.Serializable]
-public struct BasisPoseData
+public class BasisPoseData
 {
     [SerializeField]
-    public BasisMuscleLocalPose[] LeftThumb;
+    public Quaternion[] LeftThumb = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] LeftIndex;
+    public Quaternion[] LeftIndex = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] LeftMiddle;
+    public Quaternion[] LeftMiddle = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] LeftRing;
+    public Quaternion[] LeftRing = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] LeftLittle;
+    public Quaternion[] LeftLittle = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] RightThumb;
+    public Quaternion[] RightThumb = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] RightIndex;
+    public Quaternion[] RightIndex = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] RightMiddle;
+    public Quaternion[] RightMiddle = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] RightRing;
+    public Quaternion[] RightRing = new Quaternion[3];
     [SerializeField]
-    public BasisMuscleLocalPose[] RightLittle;
+    public Quaternion[] RightLittle = new Quaternion[3];
 }

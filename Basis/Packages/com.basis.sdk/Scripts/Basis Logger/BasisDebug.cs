@@ -7,6 +7,10 @@ public static class BasisDebug
     {
         Debug.unityLogger.LogError("",FormatMessage(message, logTag, MessageType.Error));
     }
+    public static void LogError(string message, UnityEngine.Object Object, LogTag logTag = LogTag.System)
+    {
+        Debug.unityLogger.LogError("", FormatMessage(message, logTag, MessageType.Error), Object);
+    }
     public static void LogError(Exception message, LogTag logTag = LogTag.System)
     {
         Debug.unityLogger.LogError("", FormatMessage($"{message.Message} {message.StackTrace}", logTag, MessageType.Error));
@@ -58,6 +62,7 @@ public static class BasisDebug
             LogTag.Mirror => "#708090",       // Slate Gray
             LogTag.Local => "#20B2AA",        // Light Sea Green
             LogTag.Remote => "#DC143C",       // Crimson
+            LogTag.Video => "#00ffff",        // Cyan
             _ => "#FFFFFF"                    // Default White
         };
     }
@@ -103,6 +108,7 @@ public static class BasisDebug
         Mirror,
         Local,
         Remote,
+        Video
     }
 
     public enum MessageType

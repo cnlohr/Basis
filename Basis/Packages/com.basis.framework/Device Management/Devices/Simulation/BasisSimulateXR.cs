@@ -26,25 +26,9 @@ namespace Basis.Scripts.Device_Management.Devices.Simulation
             BasisDeviceManagement.Instance.TryAdd(BasisInput);
             return BasisInput;
         }
-        public override void StopSDK()
+        public override bool IsDeviceBootable(string BootRequest)
         {
-        }
-
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        public override void BeginLoadSDK()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-        {
-        }
-
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        public override void StartSDK()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-        {
-        }
-
-        public override string Type()
-        {
-            return "SimulateXR";
+            return BootRequest == "SimulateXR";
         }
     }
 }
