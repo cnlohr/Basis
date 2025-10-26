@@ -664,6 +664,7 @@ MonoBehaviour:
     <MovementSpeedScale>k__BackingField: 0
     <MovementSpeedBoost>k__BackingField: 0
     CrouchBlend: 1
+    BasisLocalPlayerTransform: {fileID: 0}
     IsEnabled: 1
     CurrentSpeed: 0
   LocalAnimatorDriver:
@@ -896,7 +897,7 @@ MonoBehaviour:
         RightRing: []
         RightLittle: []
       Coord: {x: 0, y: 0}
-    LerpSpeed: 17
+    LerpSpeed: 22
     Poses: []
   LocalEyeDriver:
     leftEyeInitialRotation:

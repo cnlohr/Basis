@@ -19,15 +19,11 @@ public static class BasisNetworkLifeCycle
         BasisDebug.Log($"Initalizing Network Connection", BasisDebug.LogTag.Networking);
         BasisNetworkManagement.mainThreadId = Thread.CurrentThread.ManagedThreadId;
         BasisRemoteNetworkDriver.Initialize(95, Unity.Collections.Allocator.Persistent);
-
-        BasisAudioTransformDriver.Initialize(1024);
         BasisAudioRemoteSource.Initalize();
         BasisNetworkIdResolver.KnownIdMap.Clear();
         BasisNetworkIdResolver.PendingResolutions.Clear();
         BasisNetworkManagement.instantiationParameters = new InstantiationParameters(Vector3.zero, Quaternion.identity, BasisDeviceManagement.Instance.transform);
         BasisMuscleRange.Initalize();
-
-        BasisNetworkManagement.MainThreadContext = SynchronizationContext.Current;
 
         // Reset & initialize metadata defaults
         BasisNetworkPlayers.ClearAllRegistries(); // new: central place
@@ -127,13 +123,10 @@ public static class BasisNetworkLifeCycle
         BasisNetworkPlayer.OnLocalPlayerLeft = null;
         BasisNetworkPlayer.OnRemotePlayerLeft = null;
         BasisNetworkManagement.OnEnableInstanceCreate = null;
-        BasisNetworkManagement.MainThreadContext = null;
         BasisNetworkConnection.LocalPlayerPeer = null;
         BasisNetworkManagement.OnRequestServerSideDatabaseItem = null;
         Management.LocalAccessTransmitter = null;
         BasisNetworkConnection.LocalPlayerIsConnected = false;
-
-        BasisAudioTransformDriver.Shutdown();
 
         // let the MonoBehaviour reset its Instance in OnDestroy; no direct assignment here
         BasisDebug.Log("BasisNetworkManagement has been successfully shutdown.", BasisDebug.LogTag.Networking);

@@ -1,4 +1,3 @@
-using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Device_Management.Devices.OpenVR.Structs;
 using Basis.Scripts.TransformBinders.BoneControl;
 using UnityEngine;
@@ -46,6 +45,7 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
                             CurrentInputState.Trigger = SteamVR_Actions._default.Trigger.GetAxis(inputSource);
                         }
                         UpdatePlayerControl();
+                        ComputeRaycastDirection(ScaledDeviceCoord.position, ScaledDeviceCoord.rotation, Quaternion.identity);
                     }
                 }
                 else

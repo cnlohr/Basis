@@ -55,6 +55,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3a4a4d43bcc9b7643a340212d6fddeb9
+    m_Address: OnScreenControls
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3c44a2f4c5649a741ad3411f4e79d396
     m_Address: Assets/UI/Prefabs/highlightQuad.prefab
     m_ReadOnly: 0
@@ -95,6 +100,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 506f83456b9f93c40848e084d5684903
+    m_Address: HVR.Basis.Comms.FaceTracking.DefaultARKitDefinitionFile
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 561d30f605c713f49992f1f48529936b
     m_Address: LocalPlayer
     m_ReadOnly: 0
@@ -117,6 +127,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 68c19bcf0d450994caac14b3bc546184
     m_Address: BasisUIServers
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 856976bf03357524b9a73466df6c0e5f
+    m_Address: Adaptive Circle Display.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -182,6 +197,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c1e44be3809ebf446b1c38479ca9d1ed
     m_Address: Packages/com.basis.sdk/Prefabs/UI/ControllerConfig.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c65e15bc2eea6e24e8606a9091a4bf13
+    m_Address: HVR.Basis.Comms.FaceTracking.DefaultUnifiedExpressionsDefinitionFile
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

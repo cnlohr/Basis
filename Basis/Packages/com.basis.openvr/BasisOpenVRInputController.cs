@@ -1,10 +1,8 @@
 using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Device_Management.Devices.OpenVR.Structs;
 using Basis.Scripts.TransformBinders.BoneControl;
-using Unity.Mathematics;
 using UnityEngine;
 using Valve.VR;
-
 namespace Basis.Scripts.Device_Management.Devices.OpenVR
 {
     [DefaultExecutionOrder(15001)]
@@ -25,7 +23,8 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
         public TrackedDevicePose_t deviceGamePose = new TrackedDevicePose_t();
         public SteamVR_Utils.RigidTransform DeviceLocalSpace;
         public EVRCompositorError result;
-        public void Initialize( OpenVRDevice device,string UniqueID,string UnUniqueID, string subSystems, bool AssignTrackedRole,  BasisBoneTrackedRole basisBoneTrackedRole, SteamVR_Input_Sources SteamVR_Input_Sources)
+        public Vector3 RaycastOffset = new Vector3(0, 0.05f, 0.05f);
+        public void Initialize(OpenVRDevice device, string UniqueID, string UnUniqueID, string subSystems, bool AssignTrackedRole, BasisBoneTrackedRole basisBoneTrackedRole, SteamVR_Input_Sources SteamVR_Input_Sources)
         {
             HandBiasSplay = -0.8f;
 
@@ -33,13 +32,8 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
             leftHandToIKRotationOffset = new Vector3(170, 0, -120);
             rightHandToIKRotationOffset = new Vector3(170, 0, 120);
 
-            // default position offsets (tweak as needed; mirrored on X by default).
-            // set to zero if you prefer to tune in inspector.
-            leftHandToIKPositionOffset = new Vector3(0,0.05f,-0.02f);
+            leftHandToIKPositionOffset = new Vector3(0, 0.05f, -0.02f);
             rightHandToIKPositionOffset = new Vector3(0, 0.05f, -0.02f);
-
-            LeftRaycastRotationOffset = new Vector3(30, -90, 0);
-            RightRaycastRotationOffset = new Vector3(150, -90, 0);
 
             if (HasOnUpdate && DeviceposeAction != null)
             {
@@ -71,7 +65,10 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
         public override void DoPollData()
         {
             if (!SteamVR.active)
+            {
+                BasisDebug.LogError("Cant Poll SteamVR was not active");
                 return;
+            }
 
             // Buttons / axes
             CurrentInputState.GripButton = SteamVR_Actions._default.Grip.GetState(inputSource);
@@ -111,10 +108,12 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
             result = SteamVR.instance.compositor.GetLastPoseForTrackedDeviceIndex(Device.deviceIndex, ref devicePose, ref deviceGamePose);
             if (result != EVRCompositorError.None)
             {
+                //    BasisDebug.LogError($"EVRCompositorError {result}");
                 return;
             }
             if (deviceGamePose.bPoseIsValid == false)
             {
+                //   BasisDebug.LogError($"Pose was Not Valid!");
                 return;
             }
             DeviceLocalSpace = new SteamVR_Utils.RigidTransform(deviceGamePose.mDeviceToAbsoluteTracking);
@@ -162,31 +161,40 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
             float avatarScale = BasisLocalPlayer.Instance.CurrentHeight.SelectedAvatarToAvatarDefaultScale;
 
             int idxWrist = SteamVR_Skeleton_JointIndexes.wrist;
+          //  int idxIndex = SteamVR_Skeleton_JointIndexes.indexProximal;
 
             Vector3 wristLocalPos = BonePositions[idxWrist];
             Quaternion wristLocalRot = BoneRotations[idxWrist];
+
+            // Vector3 IndexLocalPos = BonePositions[idxIndex];
+            // Quaternion IndexLocalRot = BoneRotations[idxIndex];
 
             // Rotation offset (per hand)
             Quaternion rotOffset = Quaternion.Euler(isLeft ? leftHandToIKRotationOffset : rightHandToIKRotationOffset);
 
             // Scale-sensitive bits
             Vector3 ScaledLocalPose = UnscaledDeviceCoord.position * avatarScale;
+
             Vector3 WristLocalPose = wristLocalPos * avatarScale;
+            // Vector3 IndexLocalPose = IndexLocalPos * avatarScale;
 
             // Core composition (existing math)
             // Position: move from the device pose back to the wrist by the wrist's local offset
             Vector3 wristWorldPos = ScaledLocalPose - (UnscaledDeviceCoord.rotation * WristLocalPose);
 
+            // Position: move from the device pose back to the Index by the Index's local offset
+            // Vector3 indexWorldPos = ScaledLocalPose - (UnscaledDeviceCoord.rotation * IndexLocalPose);
+
             // Rotation: deviceRot * wristLocalRot (then apply extra offset)
             Quaternion baseWristWorldRot = UnscaledDeviceCoord.rotation * wristLocalRot;
             Quaternion wristWorldRot = baseWristWorldRot * rotOffset;
 
-            // -------- NEW: apply configurable position offset (device space), properly scaled
-            // The offset is authored in controller/device local coordinates (meters).
-            // We multiply by avatarScale to preserve proportions, then rotate by the device rotation
-            // so it moves with the controller orientation.
+            // Rotation: deviceRot * indexLocalRot (then apply extra offset)
+            // Quaternion baseIndexWorldRot = UnscaledDeviceCoord.rotation * IndexLocalRot;
+            // Quaternion IndexWorldRot = baseIndexWorldRot * rotOffset;
+
             Vector3 posOffsetLocal = isLeft ? leftHandToIKPositionOffset : rightHandToIKPositionOffset;
-            if (posOffsetLocal.sqrMagnitude > 0f)
+            if (UseIKPositionOffset)
             {
                 Vector3 posOffsetWorld = UnscaledDeviceCoord.rotation * (posOffsetLocal * avatarScale);
                 wristWorldPos += posOffsetWorld;
@@ -198,29 +206,14 @@ namespace Basis.Scripts.Device_Management.Devices.OpenVR
 
             HandFinal.rotation = wristWorldRot;
             HandFinal.position = wristWorldPos;
+            ControlOnlyAsHand(HandFinal.position, HandFinal.rotation);
 
             UpdateRaycastOffset();
-            ControlOnlyAsHand();
-            ComputeRaycastDirection();
+            ComputeRaycastDirection(wristWorldPos + (UnscaledDeviceCoord.rotation * (RaycastOffset * avatarScale)),HandFinal.rotation,ActiveRaycastOffset);
         }
-
         public override void ShowTrackedVisual()
         {
-            if (BasisVisualTracker == null)
-            {
-                DeviceSupportInformation Match = BasisDeviceManagement.Instance.BasisDeviceNameMatcher.GetAssociatedDeviceMatchableNames(CommonDeviceIdentifier);
-                if (Match.CanDisplayPhysicalTracker)
-                {
-                    LoadModelWithKey(Match.DeviceID);
-                }
-                else
-                {
-                    if (UseFallbackModel())
-                    {
-                        LoadModelWithKey(FallbackDeviceID);
-                    }
-                }
-            }
+            ShowTrackedVisualDefaultImplementation();
         }
 
         public override void PlayHaptic(float duration = 0.25F, float amplitude = 0.5F, float frequency = 0.5F)

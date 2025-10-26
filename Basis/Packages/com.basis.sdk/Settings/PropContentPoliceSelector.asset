@@ -325,3 +325,4 @@ MonoBehaviour:
   - UnityEngine.Timeline.SignalReceiver
   - TMPro.TextContainer
   - Basis.Scripts.UI.BasisGraphicUIRayCaster
+  - BasisZoneSwitchCCMode

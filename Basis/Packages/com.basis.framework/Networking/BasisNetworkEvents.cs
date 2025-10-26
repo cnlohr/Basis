@@ -1,13 +1,20 @@
 using Basis.Network.Core;
 using Basis.Scripts.BasisSdk.Players;
+using Basis.Scripts.Device_Management;
 using Basis.Scripts.Networking;
+using Basis.Scripts.Networking.Transmitters;
+using Basis.Scripts.Profiler;
+using Basis.Scripts.UI.UI_Panels;
 using BasisNetworkClient;
+using BasisNetworkServer.BasisNetworking;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using System.Drawing;
+using System;
+using System.Linq;
+using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 using static SerializableBasis;
-
 public static class BasisNetworkEvents
 {
     public static async void NetworkReceiveEvent(NetPeer peer, NetPacketReader Reader, byte channel, LiteNetLib.DeliveryMethod deliveryMethod)
@@ -51,11 +58,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkHandleAvatar.HandleAvatarChangeMessage(Reader);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.CreateRemotePlayerChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -63,11 +70,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(async _ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
-                    await BasisRemotePlayerFactory.HandleCreateRemotePlayer(Reader, BasisNetworkManagement.instantiationParameters);
+                    BasisRemotePlayerFactory.HandleCreateRemotePlayer(Reader, BasisNetworkManagement.instantiationParameters);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.CreateRemotePlayersForNewPeerChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -76,12 +83,12 @@ public static class BasisNetworkEvents
                     return;
                 }
                 //same as remote player but just used at the start
-                BasisNetworkManagement.MainThreadContext.Post(async _ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     //this one is called first and is also generally where the issues are.
-                    await BasisRemotePlayerFactory.HandleCreateRemotePlayer(Reader, BasisNetworkManagement.instantiationParameters);
+                    BasisRemotePlayerFactory.HandleCreateRemotePlayer(Reader, BasisNetworkManagement.instantiationParameters);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.GetCurrentOwnerRequestChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -89,11 +96,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.HandleOwnershipResponse(Reader);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.ChangeCurrentOwnerRequestChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -101,11 +108,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.HandleOwnershipTransfer(Reader);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.RemoveCurrentOwnerRequestChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -113,11 +120,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.HandleOwnershipRemove(Reader);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.VoiceChannel:
 #if UNITY_SERVER
@@ -141,11 +148,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.HandleServerSceneDataMessage(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.AvatarChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -153,11 +160,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.HandleServerAvatarDataMessage(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.NetIDAssignsChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -165,11 +172,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.MassNetIDAssign(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.netIDAssignChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -177,11 +184,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.NetIDAssign(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.LoadResourceChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -189,11 +196,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(async _ =>
+                BasisDeviceManagement.EnqueueOnMainThread(async () =>
                 {
                     await BasisNetworkGenericMessages.LoadResourceMessage(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.UnloadResourceChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -201,11 +208,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkGenericMessages.UnloadResourceMessage(Reader, deliveryMethod);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.AdminChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -213,11 +220,11 @@ public static class BasisNetworkEvents
                     Reader.Recycle();
                     return;
                 }
-                BasisNetworkManagement.MainThreadContext.Post(_ =>
+                BasisDeviceManagement.EnqueueOnMainThread(() =>
                 {
                     BasisNetworkModeration.AdminMessage(Reader);
                     Reader.Recycle();
-                }, null);
+                });
                 break;
             case BasisNetworkCommons.metaDataChannel:
                 if (ValidateSize(Reader, peer, channel) == false)
@@ -245,11 +252,46 @@ public static class BasisNetworkEvents
                 Reader.Recycle();
                 BasisNetworkManagement.OnRequestServerSideDatabaseItem?.Invoke(DatabasePrimativeMessage);
                 break;
+            case BasisNetworkCommons.ServerStatisticsChannel:
+                if (ValidateSize(Reader, peer, channel) == false)
+                {
+                    Reader.Recycle();
+                    return;
+                }
+                IncomingData(Reader);
+                Reader.Recycle();
+                break;
             default:
                 BNL.LogError($"this Channel was not been implemented {channel}");
                 Reader.Recycle();
                 break;
         }
+    }
+    public static Action<BasisNetworkStatistics.Snapshot> Snapshotdata;
+    public static void IncomingData(NetPacketReader Reader)
+    {
+        BasisNetworkStatistics.Snapshot Snapshot = BasisNetworkStatistics.Snapshot.Decode(Reader.GetRemainingBytesSegment(), true);
+        BasisDeviceManagement.EnqueueOnMainThread(() =>
+        {
+            Snapshotdata?.Invoke(Snapshot);
+        });
+    }
+    public static void RequestStatFrames()
+    {
+        NetDataWriter Writer = new NetDataWriter();
+        Writer.Put(true);
+        BasisNetworkConnection.LocalPlayerPeer.Send(Writer, BasisNetworkCommons.ServerStatisticsChannel, DeliveryMethod.ReliableOrdered);
+        BasisNetworkProfiler.AddToCounter(BasisNetworkProfilerCounter.ServerAvatarData, Writer.Length);
+        BasisDebug.Log("RequestStatFrames");
+    }
+
+    public static void StopStatFrames()
+    {
+        NetDataWriter Writer = new NetDataWriter();
+        Writer.Put(false);
+        BasisNetworkConnection.LocalPlayerPeer?.Send(Writer, BasisNetworkCommons.ServerStatisticsChannel, DeliveryMethod.ReliableOrdered);
+        BasisNetworkProfiler.AddToCounter(BasisNetworkProfilerCounter.ServerAvatarData, Writer.Length);
+        BasisDebug.Log("StopStatFrames");
     }
     public static void AuthIdentityMessage(NetPeer peer, NetPacketReader Reader, byte channel)
     {
@@ -305,6 +347,10 @@ public static class BasisNetworkEvents
             BasisUINotification.OpenNotification(disconnectInfo.Reason.ToString(), false, Vector3.zero);
             BasisDebug.LogError(disconnectInfo.Reason.ToString());
         }
+        if (BasisSetUserName.Instance != null && BasisSetUserName.Instance.Ready != null)
+        {
+            BasisSetUserName.Instance.Ready.interactable = true;
+        }
     }
     public static void PeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo)
     {
@@ -312,6 +358,10 @@ public static class BasisNetworkEvents
         if (peer == BasisNetworkConnection.LocalPlayerPeer)
         {
             BasisNetworkConnection.HandleDisconnection(peer, disconnectInfo);
+        }
+        if (BasisSetUserName.Instance != null && BasisSetUserName.Instance.Ready != null)
+        {
+            BasisSetUserName.Instance.Ready.interactable = true;
         }
     }
 }

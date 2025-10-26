@@ -13,9 +13,6 @@ namespace Basis.Scripts.BasisSdk.Interactions
         [HideInInspector]
         [field: System.NonSerialized]
         public BasisInput input { get; set; }
-        [HideInInspector]
-        [field: System.NonSerialized]
-        public Transform interactOrigin { get; set; }
         // TODO: use this ref
         [SerializeField]
         [HideInInspector]

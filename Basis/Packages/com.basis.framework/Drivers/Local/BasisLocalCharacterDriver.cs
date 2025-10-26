@@ -67,19 +67,19 @@ namespace Basis.Scripts.BasisCharacterController
         /// Value updated by <see cref="SetCrouchBlendDelta"/> which triggers <see cref="UpdateCrouchBlend"/> implicitly each simulation frame.
         /// This is generally used by event based input systems where a start and stop event are called, but per-frame updates are not.
         /// </summary>
-        private float CrouchBlendDelta = 0f;
+        public float CrouchBlendDelta = 0f;
 
         /// <summary>
         /// Indicates whether the character is considered crouching based on the CrouchBlend value being less than the defined threshold.
         /// </summary>
         public bool IsCrouching => CrouchBlend <= LocalAnimatorDriver.CrouchThreshold;
         public bool IsRunning => CurrentSpeed > DefaultMovementSpeed;
-        private bool UseMaxSpeed => BasisLocalInputActions.Instance.IsRunHeld;
+        public bool UseMaxSpeed => BasisLocalInputActions.Instance.IsRunHeld;
 
-        private BasisLocks.LockContext MovementLock = BasisLocks.GetContext(BasisLocks.Movement);
-        private BasisLocks.LockContext CrouchingLock = BasisLocks.GetContext(BasisLocks.Crouching);
-
-        public void OnDestroy()
+        public BasisLocks.LockContext MovementLock = BasisLocks.GetContext(BasisLocks.Movement);
+        public BasisLocks.LockContext CrouchingLock = BasisLocks.GetContext(BasisLocks.Crouching);
+        public Transform BasisLocalPlayerTransform;
+        public void DeInitalize()
         {
             if (HasEvents) HasEvents = false;
         }
@@ -87,6 +87,7 @@ namespace Basis.Scripts.BasisCharacterController
         public void Initialize(BasisLocalPlayer localPlayer)
         {
             LocalPlayer = localPlayer;
+            BasisLocalPlayerTransform = LocalPlayer.transform;
             LocalAnimatorDriver = localPlayer.LocalAnimatorDriver;
             characterController.minMoveDistance = 0;
             characterController.skinWidth = 0.01f;
@@ -113,15 +114,15 @@ namespace Basis.Scripts.BasisCharacterController
         }
 
         public bool IsEnabled = true;
-        public void SimulateMovement(float DeltaTime, Transform PlayersTransform)
+        public void SimulateMovement(float DeltaTime)
         {
-            if(!IsEnabled)
+            if (!IsEnabled)
             {
                 return;
             }
             LastBottomPoint = bottomPointLocalSpace;
             CalculateCharacterSize();
-            HandleMovement(DeltaTime, PlayersTransform);
+            HandleMovement(DeltaTime);
             GroundCheck();
 
             // Calculate the rotation amount for this frame
@@ -167,13 +168,13 @@ namespace Basis.Scripts.BasisCharacterController
 
             Vector3 FinalRotation = pivot + rotatedDirection;
 
-            PlayersTransform.SetPositionAndRotation(FinalRotation, rotation * CurrentRotation);
+            BasisLocalPlayerTransform.SetPositionAndRotation(FinalRotation, rotation * CurrentRotation);
 
             float HeightOffset = (characterController.height / 2) - characterController.radius;
             bottomPointLocalSpace = FinalRotation + (characterController.center - new Vector3(0, HeightOffset, 0));
         }
 
-        public void HandleJump()
+        public void HandleJumpRequest()
         {
             if (groundedPlayer && !HasJumpAction)
             {
@@ -237,7 +238,7 @@ namespace Basis.Scripts.BasisCharacterController
         }
 
         public float CurrentSpeed;
-        public void HandleMovement(float DeltaTime,Transform PlayersTransform)
+        public void HandleMovement(float DeltaTime)
         {
             // Cache current rotation and zero out x and z components
             currentRotation = BasisLocalBoneDriver.HeadControl.OutgoingWorldData.rotation;
@@ -280,7 +281,7 @@ namespace Basis.Scripts.BasisCharacterController
 
             // Move character
             Flags = characterController.Move(totalMoveDirection);
-            PlayersTransform.GetPositionAndRotation(out CurrentPosition, out CurrentRotation);
+            BasisLocalPlayerTransform.GetPositionAndRotation(out CurrentPosition, out CurrentRotation);
         }
         public void CalculateCharacterSize()
         {

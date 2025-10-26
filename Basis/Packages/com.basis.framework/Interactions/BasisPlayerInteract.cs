@@ -73,9 +73,10 @@ namespace Basis.Scripts.BasisSdk.Interactions
             for (int Index = 0; Index < count; Index++)
             {
                 BasisInteractInput input = InteractInputs[Index];
-                if (input.interactOrigin != null)
+                if (input.lineRenderer != null)
                 {
-                    Destroy(input.interactOrigin.gameObject);
+                    Destroy(input.lineRenderer.gameObject);
+                    input.lineRenderer = null;
                 }
             }
         }
@@ -119,7 +120,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
                 BasisHoverSphere hoverSphere = interactInput.hoverSphere;
 
                 // poll hover
-                hoverSphere.PollSystem(interactInput.interactOrigin.position);
+                hoverSphere.PollSystem(interactInput.input.RaycastCoord.position);
 
                 RaycastHit rayHit;
                 BasisInteractableObject hitInteractable = null;
@@ -197,12 +198,12 @@ namespace Basis.Scripts.BasisSdk.Interactions
                     BasisInteractInput input = InteractInputs[Index];
                     if (input.lastTarget != null && input.lastTarget.IsHoveredBy(input.input))
                     {
-                        Vector3 origin = input.interactOrigin.position;
+                        Vector3 origin = input.input.RaycastCoord.position;
                         Vector3 start;
                         // desktop offset for center eye (a little to the bottom right)
                         if (IsDesktopCenterEye(input.input))
                         {
-                            start = input.interactOrigin.position + (input.interactOrigin.forward * 0.1f) + Vector3.down * 0.1f + (input.interactOrigin.right * 0.1f);
+                            start = input.input.RaycastCoord.position + (input.input.RaycastCoord.rotation * Vector3.forward * 0.1f) + Vector3.down * 0.1f + (input.input.RaycastCoord.rotation * Vector3.right * 0.1f);
                         }
                         else
                         {
@@ -391,8 +392,11 @@ namespace Basis.Scripts.BasisSdk.Interactions
                 }
 
                 // Destroy the interact origin
-                Destroy(input.interactOrigin.gameObject);
-
+                if (input.lineRenderer != null)
+                {
+                    Destroy(input.lineRenderer.gameObject);
+                    input.lineRenderer = null;
+                }
                 // Manually resize the array
                 InteractInputs = InteractInputs
                     .Where(x => x.deviceUid != input.deviceUid) // Exclude the removed input
@@ -405,15 +409,15 @@ namespace Basis.Scripts.BasisSdk.Interactions
         }
         private void AddInput(BasisInput input)
         {
-            GameObject interactOrigin = new GameObject("Interact Origin");
+            GameObject interactOrigin = new GameObject($"{input.name} Line Renderer");
 
             LineRenderer lineRenderer = interactOrigin.AddComponent<LineRenderer>();
 
             // deskies cant hover grab :)
             // TODO: pass up max hits for config 
-            BasisHoverSphere hoverSphere = new BasisHoverSphere(interactOrigin.transform.position, hoverRadius, 128, Mask, !IsDesktopCenterEye(input), OnlySortClosest);
+            BasisHoverSphere hoverSphere = new BasisHoverSphere(input.RaycastCoord.position, hoverRadius, 128, Mask, !IsDesktopCenterEye(input), OnlySortClosest);
 
-            interactOrigin.transform.SetParent(input.transform);
+            interactOrigin.transform.SetParent(BasisLocalPlayer.Instance.transform);
             interactOrigin.layer = IgnoreRaycasting;
             interactOrigin.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             lineRenderer.enabled = false;
@@ -429,7 +433,6 @@ namespace Basis.Scripts.BasisSdk.Interactions
             {
                 deviceUid = input.UniqueDeviceIdentifier,
                 input = input,
-                interactOrigin = interactOrigin.transform,
                 lineRenderer = lineRenderer,
                 hoverSphere = hoverSphere,
             };
@@ -455,7 +458,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
                     foreach (var hit in hits)
                     {
                         // BasisDebug.Log($"hit: {hit}");
-                        Gizmos.DrawLine(device.interactOrigin.position, hit.Item1.closestPointToCenter);
+                        Gizmos.DrawLine(device.input.RaycastCoord.position, hit.Item1.closestPointToCenter);
                     }
                 }
 
@@ -464,7 +467,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
                 Gizmos.color = Color.blue;
                 if (device.hoverSphere != null && ClosestInfluencableHover(device.hoverSphere, device.input) is var result && result.Item2 != null)
                 {
-                    Gizmos.DrawLine(device.interactOrigin.position, result.Item1.closestPointToCenter);
+                    Gizmos.DrawLine(device.input.RaycastCoord.position, result.Item1.closestPointToCenter);
                 }
                 Gizmos.color = Color.gray;
 

@@ -1,427 +1,789 @@
-using Basis.Scripts.Avatar;
-using Basis.Scripts.BasisSdk.Helpers;
-using Basis.Scripts.BasisSdk.Players;
-using Basis.Scripts.TransformBinders.BoneControl;
+using Basis.Scripts.Common;
+using Basis.Scripts.Drivers;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.Jobs;
 
-namespace Basis.Scripts.Drivers
+/// <summary>
+/// Indices used to address bones in flat SoA/arrays for jobs.
+/// </summary>
+public static class BoneIdx
 {
-    [Serializable]
-    public class BasisRemoteBoneDriver
+    /// <summary>Head bone index.</summary>
+    public const int Head = 0;
+    /// <summary>Neck bone index.</summary>
+    public const int Neck = 1;
+    /// <summary>Chest bone index.</summary>
+    public const int Chest = 2;
+    /// <summary>Spine bone index.</summary>
+    public const int Spine = 3;
+    /// <summary>Hips/root bone index.</summary>
+    public const int Hips = 4;
+    /// <summary>Center-eye (between the eyes) index.</summary>
+    public const int CenterEye = 5;
+    /// <summary>Mouth anchor index.</summary>
+    public const int Mouth = 6;
+    /// <summary>Total number of bones supported.</summary>
+    public const int BoneCount = 7;
+}
+
+/// <summary>
+/// Authoring-time TPose data and local offsets (unscaled) used by the bone solver.
+/// Values are in avatar-local space relative to <c>rootWorld</c>.
+/// </summary>
+public struct TposeAndOffsetDataJob
+{
+    /// <summary>Unscaled TPose local position of the head.</summary>
+    public float3 tposeLocal_unscaled_Head;
+    /// <summary>Unscaled TPose local position of the neck.</summary>
+    public float3 tposeLocal_unscaled_Neck;
+    /// <summary>Unscaled TPose local position of the chest.</summary>
+    public float3 tposeLocal_unscaled_Chest;
+    /// <summary>Unscaled TPose local position of the spine.</summary>
+    public float3 tposeLocal_unscaled_Spine;
+    /// <summary>Unscaled TPose local position of the hips.</summary>
+    public float3 tposeLocal_unscaled_Hips;
+    /// <summary>Unscaled TPose local position of the center eye.</summary>
+    public float3 tposeLocal_unscaled_CenterEye;
+    /// <summary>Unscaled TPose local position of the mouth.</summary>
+    public float3 tposeLocal_unscaled_Mouth;
+
+    /// <summary>Unscaled offset from head to neck.</summary>
+    public float3 offsets_unscaled_Neck;
+    /// <summary>Unscaled offset from neck to chest.</summary>
+    public float3 offsets_unscaled_Chest;
+    /// <summary>Unscaled offset from chest to spine (down-chain).</summary>
+    public float3 offsets_unscaled_Spine;      // Chest→Spine in this chain
+    /// <summary>Unscaled offset from head to center-eye.</summary>
+    public float3 offsets_unscaled_CenterEye;
+    /// <summary>Unscaled offset from head to mouth.</summary>
+    public float3 offsets_unscaled_Mouth;
+}
+
+/// <summary>
+/// Per-frame world-space inputs and precomputed rotations/scales consumed by the solver.
+/// </summary>
+public struct GeneratedTranslationalData
+{
+    /// <summary>World-space root position used as the avatar-local origin baseline.</summary>
+    public float3 rootWorld;
+    /// <summary>Head world position.</summary>
+    public float3 headWPos;
+    /// <summary>Hips world position.</summary>
+    public float3 hipsWPos;
+    /// <summary>Head world rotation.</summary>
+    public quaternion headWRot;
+    /// <summary>Hips world rotation.</summary>
+    public quaternion hipsWRot;
+    /// <summary>TPose-space reference rotation for the head.</summary>
+    public quaternion tposeHeadRot;
+    /// <summary>TPose-space reference rotation for the hips.</summary>
+    public quaternion tposeHipsRot;
+    /// <summary>Current world scale derived from the root transform.</summary>
+    public float3 nowScale;
+}
+
+/// <summary>
+/// Per-frame scale cache (scaled TPose and offsets) to avoid recomputing in downstream passes.
+/// </summary>
+public struct RemoteScaleCache
+{
+    /// <summary>Scaled TPose local hips.</summary>
+    public float3 tposeLocal_scaled_Hips;
+    /// <summary>Scaled TPose local mouth.</summary>
+    public float3 tposeLocal_scaled_Mouth;
+    /// <summary>Scaled head→neck offset.</summary>
+    public float3 offsets_scaled_Neck;
+    /// <summary>Scaled neck→chest offset.</summary>
+    public float3 offsets_scaled_Chest;
+    /// <summary>Scaled chest→spine offset.</summary>
+    public float3 offsets_scaled_Spine;
+    /// <summary>Scaled head→center-eye offset.</summary>
+    public float3 offsets_scaled_CenterEye;
+    /// <summary>Scaled head→mouth offset.</summary>
+    public float3 offsets_scaled_Mouth;
+}
+
+/// <summary>
+/// Final pose outputs per bone used by apply passes (nameplate/mouth/etc).
+/// </summary>
+public struct RemoteFrameOutput
+{
+    /// <summary>World positions for the pose.</summary>
+    public float3 pos_Head, pos_Neck, pos_Chest, pos_Spine, pos_Hips, pos_CenterEye, pos_Mouth;
+    /// <summary>World rotations for the pose.</summary>
+    public quaternion rot_Head, rot_Neck, rot_Chest, rot_Spine, rot_Hips, rot_CenterEye, rot_Mouth;
+    /// <summary>
+    /// Vertical delta between hips and mouth in scaled TPose space (used for UI placement).
+    /// </summary>
+    public float HeightAvatarHipCoord;
+}
+
+/// <summary>
+/// Core remote bone job: scales authoring offsets, composes head/hips transforms,
+/// computes derived joint positions, and writes a <see cref="RemoteFrameOutput"/>.
+/// </summary>
+[BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low)]
+public struct BasisRemoteBoneJob : IJobParallelFor
+{
+    /// <summary>Authoring-time TPose and offset data (unscaled).</summary>
+    [ReadOnly] public NativeArray<TposeAndOffsetDataJob> Authoring;
+    /// <summary>Per-frame inputs (root/head/hips/tpose quats/scales).</summary>
+    [ReadOnly] public NativeArray<GeneratedTranslationalData> In;
+    /// <summary>Per-frame pose outputs.</summary>
+    [WriteOnly]
+    public NativeArray<RemoteFrameOutput> Out;
+    /// <summary>Writable per-frame scale cache (scaled TPose and offsets).</summary>
+    public NativeArray<RemoteScaleCache> GeneratedScales;
+
+    /// <summary>
+    /// Executes the bone solve for one avatar.
+    /// </summary>
+    /// <param name="i">Avatar index.</param>
+    public void Execute(int i)
     {
-        // Config / references
-        public int ControlsLength;
-        public BasisRemotePlayer RemotePlayer;
+        var a = Authoring[i];
+        var f = In[i];
+        var sc = GeneratedScales[i];
 
-        public Transform RemotePlayerTransform { get; private set; }
+        // Scale TPose + offsets by current world scale
+        sc.tposeLocal_scaled_Hips = a.tposeLocal_unscaled_Hips * f.nowScale;
+        sc.tposeLocal_scaled_Mouth = a.tposeLocal_unscaled_Mouth * f.nowScale;
+        sc.offsets_scaled_Neck = a.offsets_unscaled_Neck * f.nowScale;
+        sc.offsets_scaled_Chest = a.offsets_unscaled_Chest * f.nowScale;
+        sc.offsets_scaled_Spine = a.offsets_unscaled_Spine * f.nowScale;
+        sc.offsets_scaled_CenterEye = a.offsets_unscaled_CenterEye * f.nowScale;
+        sc.offsets_scaled_Mouth = a.offsets_unscaled_Mouth * f.nowScale;
+        GeneratedScales[i] = sc;
 
-        public BasisRemoteBoneControl Head;
-        public BasisRemoteBoneControl Hips;
-        public BasisRemoteBoneControl Mouth;
+        // Compose world rotations (TPose→current)
+        quaternion headR = math.mul(f.tposeHeadRot, f.headWRot);
+        quaternion hipsR = math.mul(f.tposeHipsRot, f.hipsWRot);
 
-        [SerializeField] public BasisRemoteBoneControl[] Controls;
-        [SerializeField] public BasisBoneTrackedRole[] trackedRoles;
+        // Convert to avatar-local positions relative to rootWorld
+        float3 headP = f.headWPos - f.rootWorld;
+        float3 hipsP = f.hipsWPos - f.rootWorld;
 
-        public bool HasControls;
+        // Forward chain from head using headR and scaled offsets
+        float3 neckP = headP + math.mul(headR, sc.offsets_scaled_Neck);
+        float3 chestP = neckP + math.mul(headR, sc.offsets_scaled_Chest);
+        float3 spineP = chestP + math.mul(headR, sc.offsets_scaled_Spine);
+        float3 eyeP = headP + math.mul(headR, sc.offsets_scaled_CenterEye);
+        float3 mouthP = headP + math.mul(headR, sc.offsets_scaled_Mouth);
 
-        public const float DefaultGizmoSize = 0.05f;
-
-        // Caches to avoid O(n) scans
-        // role -> index and control -> index maps (populated in CreateInitialArrays/AddRange)
-        Dictionary<BasisBoneTrackedRole, int> _roleToIndex;
-        Dictionary<BasisRemoteBoneControl, int> _controlToIndex;
-
-        // Scale caches
-        Vector3 _lastScale = Vector3.zero;
-        Vector3 _lastInitialScale = Vector3.zero;
-
-        // Reusable color cache
-        Color[] _rainbowCache;
-
-        #region Initialization
-
-        public void InitializeRemote()
+        float3 RotationIgnoredMouthP = hipsP + sc.offsets_scaled_Mouth;
+        Out[i] = new RemoteFrameOutput
         {
-            // Role maps might not exist yet (CreateInitialArrays handles normally), but guard anyway.
-            EnsureMaps();
+            pos_Head = headP,
+            pos_Neck = neckP,
+            pos_Chest = chestP,
+            pos_Spine = spineP,
+            pos_Hips = hipsP,
+            pos_CenterEye = eyeP,
+            pos_Mouth = mouthP,
 
-            FindBone(out Head, BasisBoneTrackedRole.Head);
-            FindBone(out Hips, BasisBoneTrackedRole.Hips);
-            Head.HasTracked = BasisHasTracked.HasTracker;
-            Hips.HasTracked = BasisHasTracked.HasTracker;
-            FindBone(out Mouth, BasisBoneTrackedRole.Mouth);
-        }
+            rot_Head = headR,
+            rot_Neck = headR,
+            rot_Chest = headR,
+            rot_Spine = headR,
+            rot_Hips = hipsR,
+            rot_CenterEye = headR,
+            rot_Mouth = headR,
+            // Used for vertical offsetting of the nameplate UI
+            HeightAvatarHipCoord = sc.tposeLocal_scaled_Hips.y * 1.2f
+        };
+    }
+}
 
-        public void OnCalibration(BasisRemotePlayer remotePlayer)
+/// <summary>
+/// Gathers world root position and approximated lossy scale for each avatar root
+/// (computed from the local-to-world matrix inside jobs).
+/// </summary>
+[BurstCompile]
+struct GatherRootJob : IJobParallelForTransform
+{
+    /// <summary>Output world positions for roots.</summary>
+    [WriteOnly] public NativeArray<float3> rootPos;
+    /// <summary>Output lossy scales for roots.</summary>
+    [WriteOnly] public NativeArray<float3> rootScale;
+
+    /// <summary>Executes per-transform sampling for the root.</summary>
+    public void Execute(int index, TransformAccess tx)
+    {
+        rootPos[index] = tx.position;
+
+        // derive world scale from matrix (no API call to lossyScale in jobs)
+        var m = tx.localToWorldMatrix;
+        float3 sx = new float3(m.m00, m.m10, m.m20);
+        float3 sy = new float3(m.m01, m.m11, m.m21);
+        float3 sz = new float3(m.m02, m.m12, m.m22);
+        rootScale[index] = new float3(math.length(sx), math.length(sy), math.length(sz));
+    }
+}
+
+/// <summary>
+/// Gathers head world-space position and rotation.
+/// </summary>
+[BurstCompile]
+struct GatherHeadJob : IJobParallelForTransform
+{
+    /// <summary>Output head positions.</summary>
+    [WriteOnly] public NativeArray<float3> headPos;
+    /// <summary>Output head rotations.</summary>
+    [WriteOnly] public NativeArray<quaternion> headRot;
+
+    /// <summary>Executes per-head sampling.</summary>
+    public void Execute(int index, TransformAccess tx)
+    {
+        headPos[index] = tx.position;
+        headRot[index] = tx.rotation;
+    }
+}
+
+/// <summary>
+/// Gathers hips world-space position and rotation.
+/// </summary>
+[BurstCompile]
+struct GatherHipsJob : IJobParallelForTransform
+{
+    /// <summary>Output hips positions.</summary>
+    [WriteOnly] public NativeArray<float3> hipsPos;
+    /// <summary>Output hips rotations.</summary>
+    [WriteOnly] public NativeArray<quaternion> hipsRot;
+
+    /// <summary>Executes per-hip sampling.</summary>
+    public void Execute(int index, TransformAccess tx)
+    {
+        hipsPos[index] = tx.position;
+        hipsRot[index] = tx.rotation;
+    }
+}
+
+/// <summary>
+/// Applies the mouth transform directly from the computed <see cref="RemoteFrameOutput"/>.
+/// </summary>
+[BurstCompile]
+struct ApplyMouthJob : IJobParallelForTransform
+{
+    /// <summary>Read-only pose data to apply.</summary>
+    [ReadOnly]
+    public NativeArray<RemoteFrameOutput> MouthRotation;
+
+    /// <summary>Applies position and rotation to the bound mouth transform.</summary>
+    public void Execute(int index, TransformAccess tx)
+    {
+        tx.SetPositionAndRotation(MouthRotation[index].pos_Mouth, MouthRotation[index].rot_Mouth);
+    }
+}
+
+/// <summary>
+/// Positions the floating nameplate relative to the avatar and rotates it to face the camera (yaw only).
+/// Uses derived TPose vertical delta to place the plate above the head.
+/// </summary>
+[BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low)]
+public struct MappedNameplateApplyJob : IJobParallelForTransform
+{
+    /// <summary>Camera world position used to bill-board the plate (yaw-only).</summary>
+    public float3 CameraPosition;
+
+    /// <summary>Input pose data (per-avatar) for nameplate placement.</summary>
+    [ReadOnly] public NativeArray<RemoteFrameOutput> NamePlateIn;
+
+    /// <summary>Computes position above hips and rotates toward camera.</summary>
+    public void Execute(int jobIndex, TransformAccess tx)
+    {
+        var data = NamePlateIn[jobIndex];
+        float3 hips = data.pos_Hips;
+
+        // y = hips.y + diff * 1.8
+        float3 nameplatePos = new float3(hips.x, hips.y + data.HeightAvatarHipCoord, hips.z);
+
+        // Face the camera (yaw only) with zero-distance guard.
+        float3 toCam = CameraPosition - nameplatePos;
+        float2 xz = new float2(toCam.x, toCam.z);
+        float yaw = math.lengthsq(xz) > 1e-12f ? math.atan2(xz.x, xz.y) : 0f;
+        quaternion rot = quaternion.RotateY(yaw);
+
+        tx.SetPositionAndRotation(nameplatePos, rot);
+    }
+}
+
+/// <summary>
+/// Aggregates all gathered transform samples and t-pose quaternions into
+/// a single per-avatar struct used by the main bone simulation.
+/// </summary>
+[BurstCompile]
+struct AgrigateTranslationalData : IJobParallelFor
+{
+    /// <summary>Root world positions.</summary>
+    [ReadOnly] public NativeArray<float3> rootPos;
+    /// <summary>Root lossy scales.</summary>
+    [ReadOnly] public NativeArray<float3> rootScale;
+    /// <summary>Head world positions.</summary>
+    [ReadOnly] public NativeArray<float3> headPos;
+    /// <summary>Head world rotations.</summary>
+    [ReadOnly] public NativeArray<quaternion> headRot;
+    /// <summary>Hips world positions.</summary>
+    [ReadOnly] public NativeArray<float3> hipsPos;
+    /// <summary>Hips world rotations.</summary>
+    [ReadOnly] public NativeArray<quaternion> hipsRot;
+    /// <summary>TPose head quaternions.</summary>
+    [ReadOnly] public NativeArray<quaternion> tposeHeadRot;
+    /// <summary>TPose hips quaternions.</summary>
+    [ReadOnly] public NativeArray<quaternion> tposeHipsRot;
+
+    /// <summary>Combined output to be consumed by <see cref="BasisRemoteBoneJob"/>.</summary>
+    [WriteOnly]
+    public NativeArray<GeneratedTranslationalData> InOut;
+
+    /// <summary>Aggregates inputs into a single SoA element.</summary>
+    public void Execute(int i)
+    {
+        InOut[i] = new GeneratedTranslationalData
         {
-            // Use the incoming parameter directly; don't rely on stale RemotePlayer
-            RemotePlayer = remotePlayer;
+            rootWorld = rootPos[i],
+            headWPos = headPos[i],
+            hipsWPos = hipsPos[i],
+            headWRot = headRot[i],
+            hipsWRot = hipsRot[i],
+            tposeHeadRot = tposeHeadRot[i],
+            tposeHipsRot = tposeHipsRot[i],
+            nowScale = rootScale[i]
+        };
+    }
+}
 
-            // Cache transform for repeated use
-            RemotePlayerTransform = RemotePlayer.transform;
-        }
+/// <summary>
+/// Static orchestration layer for remote bone simulation.
+/// Manages persistent SoA buffers, TransformAccessArrays, scheduling, and disposal.
+/// </summary>
+public static class RemoteBoneJobSystem
+{
+    // Persistent SoA
+    /// <summary>Authoring TPose/offsets per avatar.</summary>
+    static NativeList<TposeAndOffsetDataJob> sAuthoring;
+    /// <summary>Per-frame inputs per avatar.</summary>
+    static NativeList<GeneratedTranslationalData> sIn;
+    /// <summary>Per-frame scale caches per avatar.</summary>
+    static NativeList<RemoteScaleCache> sScale;
+    /// <summary>Per-frame pose outputs per avatar.</summary>
+    static NativeList<RemoteFrameOutput> sOut;
 
-        public void CreateInitialArrays(bool isLocal)
+    // Cached TPose quats (job friendly)
+    /// <summary>TPose head quaternions per avatar.</summary>
+    static NativeList<quaternion> sTPoseHeadRot;
+    /// <summary>TPose hips quaternions per avatar.</summary>
+    static NativeList<quaternion> sTPoseHipsRot;
+
+    // Transform access arrays (roots / heads / hips)
+    /// <summary>Root transforms per avatar.</summary>
+    static TransformAccessArray sRoots;
+    /// <summary>Head transforms per avatar.</summary>
+    static TransformAccessArray sHeads;
+    /// <summary>Hips transforms per avatar.</summary>
+    static TransformAccessArray sHips;
+
+    /// <summary>Nameplate transforms per avatar.</summary>
+    static TransformAccessArray sNamePlate;
+    /// <summary>Avatar scale proxy transforms per avatar.</summary>
+    static TransformAccessArray sAvatarScale;
+    /// <summary>Mouth transforms per avatar.</summary>
+    static TransformAccessArray sMouth;
+
+    // Temp per-frame buffers (reused)
+    /// <summary>Temp root positions.</summary>
+    static NativeArray<float3> sTmpRootPos, sTmpHeadPos, sTmpHipsPos;
+    /// <summary>Temp root scales.</summary>
+    static NativeArray<float3> sTmpRootScale;
+    /// <summary>Temp head rotations.</summary>
+    static NativeArray<quaternion> sTmpHeadRot, sTmpHipsRot;
+
+    // Bookkeeping
+    /// <summary>Map from external key → internal SoA index.</summary>
+    static readonly Dictionary<int, int> sKeyToIndex = new Dictionary<int, int>();
+    /// <summary>Pending job handle chain.</summary>
+    static JobHandle sPending;
+    /// <summary>Initialization flag.</summary>
+    static bool sInitialized;
+
+    /// <summary>
+    /// Allocates persistent containers and sets initial capacities for all arrays.
+    /// Safe to call multiple times; subsequent calls are ignored once initialized.
+    /// </summary>
+    /// <param name="initialCapacity">Optional starting capacity hint.</param>
+    public static void Initialize(int initialCapacity = 0)
+    {
+        if (sInitialized) return;
+
+        sAuthoring = new NativeList<TposeAndOffsetDataJob>(initialCapacity, Allocator.Persistent);
+        sIn = new NativeList<GeneratedTranslationalData>(initialCapacity, Allocator.Persistent);
+        sScale = new NativeList<RemoteScaleCache>(initialCapacity, Allocator.Persistent);
+        sOut = new NativeList<RemoteFrameOutput>(initialCapacity, Allocator.Persistent);
+
+        sTPoseHeadRot = new NativeList<quaternion>(initialCapacity, Allocator.Persistent);
+        sTPoseHipsRot = new NativeList<quaternion>(initialCapacity, Allocator.Persistent);
+
+        sRoots = new TransformAccessArray(initialCapacity);
+        sHeads = new TransformAccessArray(initialCapacity);
+        sHips = new TransformAccessArray(initialCapacity);
+
+        sNamePlate = new TransformAccessArray(initialCapacity);
+        sAvatarScale = new TransformAccessArray(initialCapacity);
+        sMouth = new TransformAccessArray(initialCapacity);
+
+        sInitialized = true;
+    }
+
+    /// <summary>
+    /// Disposes all persistent containers and temp buffers, and clears bookkeeping.
+    /// </summary>
+    public static void Dispose()
+    {
+        CompletePending();
+
+        if (sAuthoring.IsCreated) sAuthoring.Dispose();
+        if (sIn.IsCreated) sIn.Dispose();
+        if (sScale.IsCreated) sScale.Dispose();
+        if (sOut.IsCreated) sOut.Dispose();
+
+        if (sTPoseHeadRot.IsCreated) sTPoseHeadRot.Dispose();
+        if (sTPoseHipsRot.IsCreated) sTPoseHipsRot.Dispose();
+
+        if (sRoots.isCreated) sRoots.Dispose();
+        if (sHeads.isCreated) sHeads.Dispose();
+        if (sHips.isCreated) sHips.Dispose();
+
+        if (sNamePlate.isCreated) sNamePlate.Dispose();
+        if (sAvatarScale.isCreated) sAvatarScale.Dispose();
+        if (sMouth.isCreated) sMouth.Dispose();
+
+        DisposeTempBuffers();
+
+        sKeyToIndex.Clear();
+        sInitialized = false;
+    }
+
+    /// <summary>
+    /// Completes any pending scheduled jobs and resets the pending handle.
+    /// </summary>
+    static void CompletePending()
+    {
+        sPending.Complete();
+        sPending = default;
+    }
+
+    /// <summary>
+    /// Registers a remote avatar into the job system and returns the same key for convenience.
+    /// Computes authoring TPose data/offsets in avatar-local space and caches TPose quats.
+    /// </summary>
+    /// <param name="key">External key identifying the avatar.</param>
+    /// <param name="remotePlayerRoot">Avatar root transform.</param>
+    /// <param name="head">Head transform.</param>
+    /// <param name="hips">Hips/root transform.</param>
+    /// <param name="tposeHead">Head TPose calibrated coordinates.</param>
+    /// <param name="tposeHips">Hips TPose calibrated coordinates.</param>
+    /// <param name="authoredCenterEyeWorld">Center-eye world position from authoring.</param>
+    /// <param name="authoredMouthWorld">Mouth world position from authoring.</param>
+    /// <param name="NamePlate">Nameplate transform to be driven.</param>
+    /// <param name="AvatarScale">Transform used for avatar scaling (if any).</param>
+    /// <param name="MouthTransform">Mouth transform to be driven.</param>
+    /// <returns>The provided <paramref name="key"/>.</returns>
+    public static int AddRemotePlayer(int key, Transform remotePlayerRoot, Transform head, Transform hips,
+        BasisCalibratedCoords tposeHead, BasisCalibratedCoords tposeHips, float3 authoredCenterEyeWorld,
+        float3 authoredMouthWorld, Transform NamePlate, Transform AvatarScale, Transform MouthTransform)
+    {
+        if (!sInitialized) Initialize();
+        CompletePending();
+
+        float3 rootWorld = remotePlayerRoot.position;
+        float3 ToAvatarLocal(float3 world) => world - rootWorld;
+
+        // Assemble TPose local positions (in avatar-local space)
+        float3 tHead = ToAvatarLocal(head.position);
+        float3 tNeck = float3.zero;
+        float3 tChest = float3.zero;
+        float3 tSpine = float3.zero;
+        float3 tHips = ToAvatarLocal(hips.position);
+        float3 tEye = ToAvatarLocal(authoredCenterEyeWorld);
+        float3 tMouth = ToAvatarLocal(authoredMouthWorld);
+
+        // Compute unscaled offsets
+        float3 offNeck = tNeck - tHead;
+        float3 offChest = tChest - tNeck;
+        float3 offSpine = tSpine - tChest;
+        float3 offEye = tEye - tHead;
+        float3 offMouth = tMouth - tHead;
+
+        var a = new TposeAndOffsetDataJob
         {
-            // Reset
-            trackedRoles = Array.Empty<BasisBoneTrackedRole>();
-            Controls = Array.Empty<BasisRemoteBoneControl>();
+            tposeLocal_unscaled_Head = tHead,
+            tposeLocal_unscaled_Neck = tNeck,
+            tposeLocal_unscaled_Chest = tChest,
+            tposeLocal_unscaled_Spine = tSpine,
+            tposeLocal_unscaled_Hips = tHips,
+            tposeLocal_unscaled_CenterEye = tEye,
+            tposeLocal_unscaled_Mouth = tMouth,
 
-            // Determine role count
-            int length = isLocal
-                ? Enum.GetValues(typeof(BasisBoneTrackedRole)).Length
-                : 6;
+            offsets_unscaled_Neck = offNeck,
+            offsets_unscaled_Chest = offChest,
+            offsets_unscaled_Spine = offSpine,
+            offsets_unscaled_CenterEye = offEye,
+            offsets_unscaled_Mouth = offMouth
+        };
 
-            // Colors (cache sized to max seen)
-            _rainbowCache = GenerateRainbowColors(_rainbowCache, length);
+        int idx = sAuthoring.Length;
+        EnsureTaaCapacity(idx + 1);
 
-            // Build arrays without LINQ/Concat
-            var newControls = new BasisRemoteBoneControl[length + (isLocal ? 0 : 1)];
-            var newRoles = new BasisBoneTrackedRole[length + (isLocal ? 0 : 1)];
+        sAuthoring.Add(a);
+        sIn.Add(default);
+        sScale.Add(new RemoteScaleCache());
+        sOut.Add(default);
 
-            for (int i = 0; i < length; i++)
+        sTPoseHeadRot.Add((quaternion)tposeHead.rotation);
+        sTPoseHipsRot.Add((quaternion)tposeHips.rotation);
+
+        sRoots.Add(remotePlayerRoot);
+
+        sNamePlate.Add(NamePlate);
+        sAvatarScale.Add(AvatarScale);
+        sMouth.Add(MouthTransform);
+
+        sHeads.Add(head);
+        sHips.Add(hips);
+        sKeyToIndex[key] = idx;
+        return key;
+    }
+
+    /// <summary>
+    /// Unregisters a remote avatar by key, removing it from all SoA containers and TAA sets.
+    /// Uses swap-back removal to keep arrays dense.
+    /// </summary>
+    /// <param name="key">The external key previously used to add the avatar.</param>
+    /// <returns><c>true</c> if found and removed; otherwise <c>false</c>.</returns>
+    public static bool RemoveRemotePlayer(int key)
+    {
+        if (!sInitialized) return false;
+        CompletePending();
+
+        if (!sKeyToIndex.TryGetValue(key, out int idx)) return false;
+
+        int last = sAuthoring.Length - 1;
+        if (idx != last)
+        {
+            // Swap-back SoA
+            sAuthoring[idx] = sAuthoring[last];
+            sIn[idx] = sIn[last];
+            sScale[idx] = sScale[last];
+            sOut[idx] = sOut[last];
+            sTPoseHeadRot[idx] = sTPoseHeadRot[last];
+            sTPoseHipsRot[idx] = sTPoseHipsRot[last];
+
+            sNamePlate.RemoveAtSwapBack(idx);
+            sAvatarScale.RemoveAtSwapBack(idx);
+            sMouth.RemoveAtSwapBack(idx);
+
+            sRoots.RemoveAtSwapBack(idx);
+            sHeads.RemoveAtSwapBack(idx);
+            sHips.RemoveAtSwapBack(idx);
+
+            // Update the moved key's mapping
+            int movedKey = -1;
+            foreach (var kv in sKeyToIndex)
             {
-                SetupRole(i, _rainbowCache[i], out BasisRemoteBoneControl control, out BasisBoneTrackedRole role);
-                newControls[i] = control;
-                newRoles[i] = role;
+                if (kv.Value == last) { movedKey = kv.Key; break; }
             }
+            if (movedKey != -1) sKeyToIndex[movedKey] = idx;
+        }
+        else
+        {
+            sRoots.RemoveAtSwapBack(last);
+            sHeads.RemoveAtSwapBack(last);
+            sHips.RemoveAtSwapBack(last);
 
-            if (!isLocal)
+            sNamePlate.RemoveAtSwapBack(last);
+            sAvatarScale.RemoveAtSwapBack(last);
+            sMouth.RemoveAtSwapBack(last);
+        }
+
+        sAuthoring.RemoveAt(last);
+        sIn.RemoveAt(last);
+        sScale.RemoveAt(last);
+        sOut.RemoveAt(last);
+        sTPoseHeadRot.RemoveAt(last);
+        sTPoseHipsRot.RemoveAt(last);
+        sKeyToIndex.Remove(key);
+        return true;
+    }
+
+    /// <summary>
+    /// Ensures temporary per-frame buffers exist and match the current avatar count.
+    /// </summary>
+    /// <param name="count">Number of avatars to accommodate.</param>
+    static void EnsureTempBuffers(int count)
+    {
+        if (count <= 0) return;
+
+        void AllocOrResize<T>(ref NativeArray<T> arr, int len) where T : struct
+        {
+            if (arr.IsCreated)
             {
-                // Historically index 22 has been used externally; keep behavior
-                SetupRole(22, Color.blue, out BasisRemoteBoneControl extraControl, out BasisBoneTrackedRole extraRole);
-                newControls[length] = extraControl;
-                newRoles[length] = extraRole;
-            }
-
-            AddRange(newControls, newRoles);
-
-            HasControls = true;
-            InitializeGizmos();
-        }
-
-        public void AddRange(BasisRemoteBoneControl[] newControls, BasisBoneTrackedRole[] newRoles)
-        {
-            // Allocate once and copy (avoid Concat)
-            int oldLen = Controls?.Length ?? 0;
-            int addLen = newControls.Length;
-
-            var combinedControls = new BasisRemoteBoneControl[oldLen + addLen];
-            var combinedRoles = new BasisBoneTrackedRole[oldLen + addLen];
-
-            if (oldLen > 0)
-            {
-                Array.Copy(Controls, 0, combinedControls, 0, oldLen);
-                Array.Copy(trackedRoles, 0, combinedRoles, 0, oldLen);
-            }
-
-            Array.Copy(newControls, 0, combinedControls, oldLen, addLen);
-            Array.Copy(newRoles, 0, combinedRoles, oldLen, addLen);
-
-            Controls = combinedControls;
-            trackedRoles = combinedRoles;
-            ControlsLength = Controls.Length;
-
-            // Rebuild maps
-            RebuildMaps();
-        }
-
-        public void SetupRole(int index, Color color, out BasisRemoteBoneControl basisBoneControl, out BasisBoneTrackedRole role)
-        {
-            role = (BasisBoneTrackedRole)index;
-
-            var c = new BasisRemoteBoneControl();
-            c.Initialize();
-            FillOutBasicInformation(c, role.ToString(), color);
-
-            basisBoneControl = c;
-        }
-
-        public void FillOutBasicInformation(BasisRemoteBoneControl control, string name, Color color)
-        {
-            control.name = name;
-            control.Color = color;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void EnsureMaps()
-        {
-            _roleToIndex ??= new Dictionary<BasisBoneTrackedRole, int>(64);
-            _controlToIndex ??= new Dictionary<BasisRemoteBoneControl, int>(64);
-        }
-
-        void RebuildMaps()
-        {
-            EnsureMaps();
-            _roleToIndex.Clear();
-            _controlToIndex.Clear();
-
-            for (int i = 0; i < ControlsLength; i++)
-            {
-                var role = trackedRoles[i];
-                var control = Controls[i];
-                _roleToIndex[role] = i;
-                if (control != null)
-                    _controlToIndex[control] = i;
-            }
-        }
-
-        #endregion
-
-        #region Runtime / Simulation
-        public void SimulateAndApplyRemote(Vector3 nowScale)
-        {
-            var driver = RemotePlayer.RemoteAvatarDriver;//now will never be null.
-            Vector3 initialScale = driver.AvatarInitalScale;
-
-            // Only rescale T-pose locals if scale changed (avoid per-frame work)
-            if (_lastInitialScale != initialScale || _lastScale != nowScale)
-            {
-                _lastInitialScale = initialScale;
-                _lastScale = nowScale;
-
-                for (int Index = 0; Index < ControlsLength; Index++)
+                if (arr.Length != len)
                 {
-                    BasisRemoteBoneControl control = Controls[Index];
-                    if (control == null) continue;
-
-                    // Apply relative scale to T-pose local position
-                    control.TposeLocalScaled.position = Vector3.Scale(control.TposeLocal.position, nowScale);
+                    arr.Dispose();
+                    arr = new NativeArray<T>(len, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 }
-            }
-
-            RemotePlayer.OnPreSimulateBones?.Invoke();
-
-            // Sequence devices
-            for (int i = 0; i < ControlsLength; i++)
-            {
-                var c = Controls[i];
-                c?.ComputeMovementRemote();
-            }
-
-            if (SMModuleDebugOptions.UseGizmos)
-            {
-                DrawGizmos();
-            }
-            Vector3 rrt = RemotePlayerTransform.position;
-
-            Common.BasisTransformMapping references = RemotePlayer.RemoteAvatarDriver.References;
-
-            // World rotations of head and hips
-            Quaternion HeadWorldRotation = references.head.rotation;
-            Quaternion HipsWorldRotation = references.Hips.rotation;
-            // T-pose world rotations
-            Quaternion TposeHeadWorldRotation = references.TposeHead.rotation;
-            Quaternion TposeHipsWorldRotation = references.TposeHips.rotation;
-
-            // Remove T-pose influence
-            Head.IncomingData.rotation = TposeHeadWorldRotation * HeadWorldRotation;
-            Hips.IncomingData.rotation = TposeHipsWorldRotation * HipsWorldRotation;
-
-            Head.IncomingData.position = references.head.position - rrt;
-            Hips.IncomingData.position = references.Hips.position - rrt;
-        }
-        #endregion
-
-        #region Gizmos
-
-        public void InitializeGizmos()
-        {
-            BasisGizmoManager.OnUseGizmosChanged -= UpdateGizmoUsage; // prevent double-subscribe
-            BasisGizmoManager.OnUseGizmosChanged += UpdateGizmoUsage;
-        }
-
-        public void DeInitializeGizmos()
-        {
-            BasisGizmoManager.OnUseGizmosChanged -= UpdateGizmoUsage;
-        }
-
-        public void DrawGizmos()
-        {
-            for (int i = 0; i < ControlsLength; i++)
-            {
-                var c = Controls[i];
-                if (c != null) DrawGizmos(c);
-            }
-        }
-
-        public void UpdateGizmoUsage(bool state)
-        {
-            BasisDebug.Log("Running Bone Driver Gizmos", BasisDebug.LogTag.Gizmo);
-
-            float scale = BasisLocalPlayer.Instance != null
-                ? BasisLocalPlayer.Instance.CurrentHeight.SelectedAvatarToAvatarDefaultScale
-                : 1f;
-
-            for (int i = 0; i < ControlsLength; i++)
-            {
-                var control = Controls[i];
-                if (control == null) continue;
-
-                var role = trackedRoles[i];
-
-                if (state)
-                {
-                    if (role == BasisBoneTrackedRole.CenterEye && !Application.isEditor)
-                        continue;
-
-                    Vector3 bonePos = control.OutGoingData.position;
-
-                    if (control.HasTarget)
-                    {
-                        if (BasisGizmoManager.CreateLineGizmo(role.ToString(), out control.LineDrawIndex, bonePos, control.Target.OutGoingData.position, 0.03f * scale, control.Color))
-                        {
-                            control.HasLineDraw = true;
-                        }
-                    }
-
-                    if (BasisGizmoManager.CreateSphereGizmo(role.ToString(),out control.GizmoReference, bonePos, DefaultGizmoSize * scale, control.Color))
-                    {
-                        control.HasGizmo = true;
-                    }
-                }
-                else
-                {
-                    control.HasGizmo = false;
-                }
-            }
-        }
-
-        public void DrawGizmos(BasisRemoteBoneControl control)
-        {
-            if (control == null || !control.HasBone) return;
-
-            Vector3 bonePosition = control.OutGoingData.position;
-
-            if (control.HasTarget && control.HasLineDraw)
-            {
-                BasisGizmoManager.UpdateLineGizmo(control.LineDrawIndex, bonePosition, control.Target.OutGoingData.position);
-            }
-
-            if (FindTrackedRole(control, out BasisBoneTrackedRole role))
-            {
-                if (role == BasisBoneTrackedRole.CenterEye)
-                {
-                    // Ignore center eye to avoid VR issues
-                    return;
-                }
-
-                if (control.HasGizmo)
-                {
-                    if (!BasisGizmoManager.UpdateSphereGizmo(control.GizmoReference, bonePosition))
-                    {
-                        control.HasGizmo = false;
-                    }
-                }
-            }
-
-            if (BasisLocalAvatarDriver.CurrentlyTposing && FindTrackedRole(control, out BasisBoneTrackedRole role2))
-            {
-                if (role2 == BasisBoneTrackedRole.CenterEye)
-                {
-                    // Ignore center eye to avoid VR issues
-                    return;
-                }
-
-                if (BasisBoneTrackedRoleCommonCheck.CheckItsFBTracker(role2))
-                {
-                    float scale = BasisLocalPlayer.Instance != null
-                        ? BasisLocalPlayer.Instance.CurrentHeight.SelectedAvatarToAvatarDefaultScale
-                        : 1f;
-                }
-            }
-        }
-        #endregion
-
-        #region Lookups
-
-        /// <summary>
-        /// O(1) role lookup without extra allocations. Returns false and null control if not found.
-        /// </summary>
-        public bool FindBone(out BasisRemoteBoneControl control, BasisBoneTrackedRole role)
-        {
-            control = null;
-            if (_roleToIndex != null && _roleToIndex.TryGetValue(role, out int idx))
-            {
-                if ((uint)idx < (uint)ControlsLength)
-                {
-                    control = Controls[idx];
-                    return control != null;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// O(1) control->role lookup without allocations.
-        /// </summary>
-        public bool FindTrackedRole(BasisRemoteBoneControl control, out BasisBoneTrackedRole role)
-        {
-            role = BasisBoneTrackedRole.CenterEye;
-
-            if (control == null || _controlToIndex == null) return false;
-
-            if (_controlToIndex.TryGetValue(control, out int idx))
-            {
-                if ((uint)idx < (uint)ControlsLength)
-                {
-                    role = trackedRoles[idx];
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        #endregion
-
-        #region Utilities
-
-        /// <summary>
-        /// Returns a rainbow array of size count. Reuses prior buffer when possible.
-        /// </summary>
-        public Color[] GenerateRainbowColors(Color[] cache, int count)
-        {
-            if (cache == null || cache.Length < count)
-                cache = new Color[count];
-
-            for (int i = 0; i < count; i++)
-            {
-                float hue = Mathf.Repeat(i / (float)count, 1f);
-                cache[i] = Color.HSVToRGB(hue, 1f, 1f);
-            }
-            return cache;
-        }
-
-        /// <summary>
-        /// Backwards-compatible overload kept for external callers.
-        /// </summary>
-        public Color[] GenerateRainbowColors(int requestColorCount) => GenerateRainbowColors(null, requestColorCount);
-
-        public void CreateRotationalLock(BasisRemoteBoneControl addToBone, BasisRemoteBoneControl target)
-        {
-            if (addToBone == null) return;
-
-            addToBone.Target = target;
-            if (target != null)
-            {
-                addToBone.Offset = addToBone.TposeLocalScaled.position - target.TposeLocalScaled.position;
-                addToBone.ScaledOffset = addToBone.Offset;
-                addToBone.HasTarget = true;
             }
             else
             {
-                addToBone.Offset = Vector3.zero;
-                addToBone.ScaledOffset = Vector3.zero;
-                addToBone.HasTarget = false;
+                arr = new NativeArray<T>(len, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             }
         }
+        AllocOrResize(ref sTmpRootPos, count);
+        AllocOrResize(ref sTmpRootScale, count);
+        AllocOrResize(ref sTmpHeadPos, count);
+        AllocOrResize(ref sTmpHeadRot, count);
+        AllocOrResize(ref sTmpHipsPos, count);
+        AllocOrResize(ref sTmpHipsRot, count);
+    }
 
-        #endregion
+    /// <summary>
+    /// Disposes temporary per-frame buffers if allocated.
+    /// </summary>
+    static void DisposeTempBuffers()
+    {
+        if (sTmpRootPos.IsCreated) sTmpRootPos.Dispose();
+        if (sTmpRootScale.IsCreated) sTmpRootScale.Dispose();
+        if (sTmpHeadPos.IsCreated) sTmpHeadPos.Dispose();
+        if (sTmpHeadRot.IsCreated) sTmpHeadRot.Dispose();
+        if (sTmpHipsPos.IsCreated) sTmpHipsPos.Dispose();
+        if (sTmpHipsRot.IsCreated) sTmpHipsRot.Dispose();
+    }
+
+    /// <summary>
+    /// Ensures all <see cref="TransformAccessArray"/> instances have enough capacity.
+    /// </summary>
+    /// <param name="needed">Required capacity.</param>
+    static void EnsureTaaCapacity(int needed)
+    {
+        if (sRoots.capacity < needed)
+        {
+            int newCap = math.max(needed, math.max(4, sRoots.capacity * 2));
+            sRoots.capacity = newCap;
+            sHeads.capacity = newCap;
+            sHips.capacity = newCap;
+
+            sNamePlate.capacity = newCap;
+            sAvatarScale.capacity = newCap;
+            sMouth.capacity = newCap;
+        }
+    }
+
+    /// <summary>
+    /// Schedules the entire simulation pipeline for the current set of avatars:
+    /// gather → aggregate → simulate → apply (nameplate/mouth).
+    /// </summary>
+    /// <param name="batchSize">Job batch size for parallel loops.</param>
+    /// <returns>The final <see cref="JobHandle"/> for dependency chaining.</returns>
+    public static JobHandle Schedule(int batchSize = 64)
+    {
+        if (!sInitialized || sAuthoring.Length == 0) return default;
+
+        EnsureTempBuffers(sAuthoring.Length);
+
+        // Gather root/head/hips
+        var hRoot = new GatherRootJob
+        {
+            rootPos = sTmpRootPos,
+            rootScale = sTmpRootScale
+        }.Schedule(sRoots);
+
+        var hHead = new GatherHeadJob
+        {
+            headPos = sTmpHeadPos,
+            headRot = sTmpHeadRot
+        }.Schedule(sHeads);
+
+        var hHips = new GatherHipsJob
+        {
+            hipsPos = sTmpHipsPos,
+            hipsRot = sTmpHipsRot
+        }.Schedule(sHips);
+
+        var deps = JobHandle.CombineDependencies(hRoot, hHead, hHips);
+
+        // Aggregate into per-avatar input
+        var combine = new AgrigateTranslationalData
+        {
+            rootPos = sTmpRootPos,
+            rootScale = sTmpRootScale,
+            headPos = sTmpHeadPos,
+            headRot = sTmpHeadRot,
+            hipsPos = sTmpHipsPos,
+            hipsRot = sTmpHipsRot,
+            tposeHeadRot = sTPoseHeadRot.AsDeferredJobArray(),
+            tposeHipsRot = sTPoseHipsRot.AsDeferredJobArray(),
+            InOut = sIn.AsDeferredJobArray()
+        }.Schedule(sAuthoring.Length, batchSize, deps);
+
+        // Run bone simulation
+        var BoneSimulation = new BasisRemoteBoneJob
+        {
+            Authoring = sAuthoring.AsDeferredJobArray(),
+            In = sIn.AsDeferredJobArray(),
+            GeneratedScales = sScale.AsDeferredJobArray(),
+            Out = sOut.AsDeferredJobArray()
+        }.Schedule(sAuthoring.Length, batchSize, combine);
+
+        // Apply outputs
+        Vector3 CameraPosition = BasisLocalCameraDriver.Position;
+
+        var MappedNameplateApplyJob = new MappedNameplateApplyJob
+        {
+            CameraPosition = CameraPosition,
+            NamePlateIn = sOut.AsDeferredJobArray(),
+        }.Schedule(sNamePlate, BoneSimulation);
+
+        var ApplyMouthJob = new ApplyMouthJob
+        {
+            MouthRotation = sOut.AsDeferredJobArray(),
+        }.Schedule(sMouth, MappedNameplateApplyJob);
+
+        sPending = ApplyMouthJob;
+        return ApplyMouthJob;
+    }
+
+    /// <summary>
+    /// Completes a provided handle and any internally pending chain.
+    /// </summary>
+    /// <param name="handle">The job handle to complete.</param>
+    public static void Complete(JobHandle handle)
+    {
+        handle.Complete();
+        if (!sInitialized) return;
+
+        CompletePending();
+    }
+
+    /// <summary>
+    /// Retrieves the computed outgoing/world mouth position for an avatar by key.
+    /// </summary>
+    /// <param name="key">Avatar key used when adding the player.</param>
+    /// <param name="outgoing">On success, the mouth world position; otherwise <see cref="Vector3.zero"/>.</param>
+    /// <returns><c>true</c> if the key is found; otherwise <c>false</c>.</returns>
+    public static bool GetOutGoingMouth(int key, out float3 outgoing)
+    {
+        if (!sKeyToIndex.TryGetValue(key, out int idx))
+        {
+            outgoing = Vector3.zero;
+            return false;
+        }
+        var o = sOut[idx];
+        outgoing = o.pos_Mouth;
+        return true;
     }
 }
