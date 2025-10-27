@@ -4,7 +4,7 @@ using Basis.Scripts.Device_Management.Devices;
 using Basis.Scripts.Networking;
 using Basis.Scripts.Networking.Compression;
 using BasisSerializer.OdinSerializer;
-using LiteNetLib;
+using Basis.Network.Core;
 using UnityEngine;
 public class BasisObjectSyncNetworking : BasisNetworkBehaviour
 {

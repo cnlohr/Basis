@@ -3,8 +3,6 @@ using Basis.Scripts.BasisSdk.Players;
 using Basis.Scripts.Networking.NetworkedAvatar;
 using Basis.Scripts.Profiler;
 using Basis.Scripts.TransformBinders.BoneControl;
-using LiteNetLib;
-using LiteNetLib.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
