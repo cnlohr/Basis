@@ -25,8 +25,7 @@ if [[ "$1" == "full" ]]; then
   PACKAGES+=":Packages/com.valvesoftware.unity.openvr-1.2.1.tgz"
 
   # Need this for framework (But only framework)
-  SUBFOLDERS+=":Packages/AudioLink:
-              Packages/com.basis.framework:
+  SUBFOLDERS+=":Packages/com.basis.framework:
               Packages/com.basis.framework.editor:
               Packages/com.basis.settingsmanager:
               Packages/com.basis.gizmos:
