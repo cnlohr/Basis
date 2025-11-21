@@ -48,6 +48,7 @@ if [[ "$1" == "full" ]]; then
               Packages/com.basis.profilerintergration:
               Packages/com.gator-dragon-games.jigglephysics:
               Packages/com.avionblock.opussharp:
+              Packages/UnityJigglePhysics-upm:
               Assets/Resource:
               Assets/StreamingAssets:
               Assets/Plugins:
