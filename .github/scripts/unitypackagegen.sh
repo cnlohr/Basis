@@ -35,6 +35,7 @@ if [[ "$1" == "full" ]]; then
               Packages/com.basis.examples:
               Packages/com.basis.settings:
               Packages/com.basis.shim:
+              Packages/com.cnlohr.cilbox:
               Packages/com.steam.steamvr:
               Packages/com.steam.steamaudio:
               Packages/com.hecomi.ulipsync:
