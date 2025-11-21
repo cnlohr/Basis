@@ -49,7 +49,7 @@ if [[ "$1" == "full" ]]; then
               Packages/com.gator-dragon-games.jigglephysics:
               Packages/com.avionblock.opussharp:
               Packages/UnityJigglePhysics-upm:
-              Assets/Resource:
+              Assets/Resources:
               Assets/StreamingAssets:
               Assets/Plugins:
               Assets/AddressableAssetsData:
