@@ -14,6 +14,10 @@ SUBFOLDERS="Packages/com.basis.sdk:
 
 EXTRASUBFOLDER=""
 
+EXTRASUBFOLDERS=""
+MOREFILES=""
+
+
 if [[ "$1" == "full" ]]; then
 
   echo "Producing FULL package"
@@ -30,6 +34,7 @@ if [[ "$1" == "full" ]]; then
               Packages/com.basis.addressables:
               Packages/com.basis.examples:
               Packages/com.basis.settings:
+              Packages/com.basis.shim:
               Packages/com.steam.steamvr:
               Packages/com.steam.steamaudio:
               Packages/com.hecomi.ulipsync:
@@ -49,7 +54,9 @@ if [[ "$1" == "full" ]]; then
               Assets/XR:
               Assets/Basis"
 
-EXTRASUBFOLDERS="ProjectSettings"
+  EXTRASUBFOLDERS+="ProjectSettings"
+
+  MOREFILES+="Packages/manifest.json:Packages/packages-lock.json"
 
 elif [[ "$1" == "sdk" ]]; then
   echo "Producing SDK package"
@@ -85,7 +92,7 @@ echo $SUBFOLDERS | tr : '\n' | while read ddv; do
 done
 
 # Tricky trick for exporting projectsettings
-echo $EXTRASUBFOLDERS | tr : '\n' | while read ddv; do
+echo ${EXTRASUBFOLDERS} | tr : '\n' | while read ddv; do
     find $ddv -type f -name "*.asset" -print0 | while read -d $'\0' -r FV ; do
         #printf 'File found: %s\n' "$FV"
         ASSET=$FV
@@ -106,6 +113,29 @@ echo $EXTRASUBFOLDERS | tr : '\n' | while read ddv; do
         echo "${ASSET}" > generate_unitypackage/$GUID/pathname
     done
 done
+
+echo "Adding extra files: " ${MOREFILES}
+
+echo ${MOREFILES} | tr : '\n' | while read FV ; do
+    #printf 'File found: %s\n' "$FV"
+    ASSET=$FV
+    GUID=$(echo "$FV" | md5sum | cut -d' ' -f1 | cut -b-32 )
+    mkdir -p generate_unitypackage/$GUID
+    if [[ -f "$ASSET" ]]; then
+        #echo "$ASSET" TO generate_unitypackage/$GUID/asset
+        #echo ASSET COPY cp "$ASSET" generate_unitypackage/$GUID/asset
+        cp "$ASSET" generate_unitypackage/$GUID/asset
+    fi
+
+	echo "fileFormatVersion: 2" > generate_unitypackage/$GUID/asset.meta
+	echo "guid: ${GUID}" >> generate_unitypackage/$GUID/asset.meta
+
+    #GPNAME=$(echo ${ddv:0:${#ddv} - 4} | cut -d/ -f3-)
+    FONLY=$(echo $FV | rev | cut -d. -f2- | rev)
+    echo "${ASSET}" "${GUID}"
+    echo "${ASSET}" > generate_unitypackage/$GUID/pathname
+done
+
 
 echo "Now, exporting .tgz's"
 
