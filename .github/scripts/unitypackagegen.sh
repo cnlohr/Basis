@@ -8,8 +8,8 @@ PACKAGES="Packages/org.basisvr.generator.equals-3.2.0.tgz:
         Packages/org.basisvr.bouncycastle-2.5.0.tgz"
 SUBFOLDERS="Packages/com.basis.sdk:
         Packages/com.basis.odinserializer:
+        Packages/UnityJigglePhysics-upm:
         Packages/com.basis.bundlemanagement:
-        Packages/com.gator-dragon-games.jigglephysics:
         Packages/com.basis.server"
 
 EXTRASUBFOLDER=""
@@ -27,11 +27,9 @@ if [[ "$1" == "full" ]]; then
   # Need this for framework (But only framework)
   SUBFOLDERS+=":Packages/com.basis.framework:
               Packages/com.basis.framework.editor:
-              Packages/com.basis.settingsmanager:
               Packages/com.basis.gizmos:
               Packages/com.basis.console:
               Packages/com.basis.visualtrackers:
-              Packages/com.basis.addressables:
               Packages/com.basis.examples:
               Packages/com.basis.settings:
               Packages/com.basis.shim:
@@ -46,9 +44,7 @@ if [[ "$1" == "full" ]]; then
               Packages/com.basis.openxr:
               Packages/com.basis.bundlemanagement:
               Packages/com.basis.profilerintergration:
-              Packages/com.gator-dragon-games.jigglephysics:
               Packages/com.avionblock.opussharp:
-              Packages/UnityJigglePhysics-upm:
               Assets/Resources:
               Assets/StreamingAssets:
               Assets/Plugins:
@@ -67,6 +63,8 @@ else
   echo "Only full and sdk targets are specified."
   die
 fi
+
+set -e
 
 cd Basis
 
@@ -88,7 +86,7 @@ echo $SUBFOLDERS | tr : '\n' | while read ddv; do
         cp "$FV" generate_unitypackage/$GUID/asset.meta
         #GPNAME=$(echo ${ddv:0:${#ddv} - 4} | cut -d/ -f3-)
         FONLY=$(echo $FV | rev | cut -d. -f2- | rev)
-        echo "${FONLY}"
+        echo "${FONLY}" "${GUID}"
         echo "${FONLY}" > generate_unitypackage/$GUID/pathname
     done
 done
