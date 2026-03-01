@@ -70,8 +70,8 @@ public class BasisSeatSync : BasisNetworkBehaviour
         }
         if (Seat != null)
         {
-            Seat.OnInteractStartEvent += OnInteractStartEvent;
-            Seat.OnInteractEndEvent += OnInteractEndEvent;
+            Seat.OnInteractStartEvent.AddListener(OnInteractStartEvent);
+            Seat.OnInteractEndEvent.AddListener(OnInteractEndEvent);
         }
         else
         {
@@ -175,8 +175,8 @@ public class BasisSeatSync : BasisNetworkBehaviour
         BasisLocalPlayer.JustBeforeNetworkApply.RemoveAction(20, ProvideRemotePlayerTarget);
         if (Seat != null)
         {
-            Seat.OnInteractStartEvent -= OnInteractStartEvent;
-            Seat.OnInteractEndEvent -= OnInteractEndEvent;
+            Seat.OnInteractStartEvent.RemoveListener(OnInteractStartEvent);
+            Seat.OnInteractEndEvent.RemoveListener(OnInteractEndEvent);
         }
         base.OnDestroy();
     }

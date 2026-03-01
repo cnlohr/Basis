@@ -175,7 +175,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
         
 
         BasisDeviceManagement.OnBootModeChanged -= OnBootModeChanged;
-        OnPickupUse -= OnPickupUseCapture;
+        OnPickupUse.RemoveListener( OnPickupUseCapture );
 
         base.OnDestroy();
     }
@@ -287,7 +287,7 @@ public class BasisHandHeldCamera : BasisHandHeldCameraInteractable
     public new void Start()
     {
         base.Start();
-        OnPickupUse += OnPickupUseCapture;
+        OnPickupUse.AddListener( OnPickupUseCapture );
     }
 
     /// <summary>Pickup “use” callback that triggers a capture on press down.</summary>

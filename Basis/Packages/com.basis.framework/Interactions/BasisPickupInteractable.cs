@@ -163,7 +163,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
         /// <summary>
         /// Event-like callback invoked every frame a trigger state is detected while interacting.
         /// </summary>
-        public Action<BasisPickUpUseMode> OnPickupUse;
+        public UnityEngine.Events.UnityEvent<BasisPickUpUseMode> OnPickupUse;
 
         /// <summary>
         /// Optional hook points that must all return <see langword="true"/> for hover to be allowed.
@@ -303,7 +303,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
                     }
                 }
             }
-            OnInteractStartEvent += OnInteractionEventFired;
+            OnInteractStartEvent.AddListener(OnInteractionEventFired);
         }
 
         internal void OnInteractionEventFired(BasisInput input)
@@ -884,7 +884,7 @@ namespace Basis.Scripts.BasisSdk.Interactions
         /// </summary>
         public override void OnDestroy()
         {
-            OnInteractStartEvent -= OnInteractionEventFired;
+            OnInteractStartEvent.RemoveListener(OnInteractionEventFired);
 
             Destroy(HighlightClone);
             if (asyncOperationHighlightMat.IsValid())

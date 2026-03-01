@@ -122,12 +122,12 @@ namespace Basis.Scripts.BasisSdk.Interactions
         /// <summary>
         /// Event triggered when interaction starts with an input.
         /// </summary>
-        public Action<BasisInput> OnInteractStartEvent;
+        public UnityEngine.Events.UnityEvent<BasisInput> OnInteractStartEvent;
 
         /// <summary>
         /// Event triggered when interaction ends with an input.
         /// </summary>
-        public Action<BasisInput> OnInteractEndEvent;
+        public UnityEngine.Events.UnityEvent<BasisInput> OnInteractEndEvent;
 
         /// <summary>
         /// Event triggered when hover starts from an input.

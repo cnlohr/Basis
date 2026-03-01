@@ -80,14 +80,14 @@ namespace Cilbox
 
 			// Check all parameters for type safety.
 			foreach( Type t in parameters )
-				if( CheckTypeSecurityRecursive( t ) == null ) goto disallowed;
+				if( !CheckTypeSecurityRecursive( t ) ) goto disallowed;
 			foreach( Type t in genericArguments )
-				if( CheckTypeSecurityRecursive( t ) == null ) goto disallowed;
-			if( m is MethodInfo && CheckTypeSecurityRecursive( ((MethodInfo)m).ReturnType ) == null ) goto disallowed;
+				if( !CheckTypeSecurityRecursive( t ) ) goto disallowed;
+			if( m is MethodInfo && !CheckTypeSecurityRecursive( ((MethodInfo)m).ReturnType ) ) goto disallowed;
 
 			return m;
 		disallowed:
-			Debug.LogError( $"Privelege failed {declaringType}.{name}" );
+			Debug.LogError( $"Privilege failed {declaringType}.{name}" );
 			return null;
 		}
 
@@ -298,10 +298,10 @@ namespace Cilbox
 			return typeNameNoArray + arrayEnding + refSuffix;
 		}
 
-		Type CheckTypeSecurityRecursive( Type t )
+		public bool CheckTypeSecurityRecursive( Type t )
 		{
 			TypeInfo typeInfo = t.GetTypeInfo();
-			if( typeInfo == null ) return null;
+			if( typeInfo == null ) return false;
 			String typeName = typeInfo.ToString();
 			// Perform check by removing "&" from the end of ref types
 			// This happens when the type is a reference to a specific type
@@ -313,12 +313,12 @@ namespace Cilbox
 			String [] vTypeNameNoGenerics = typeName.Split( "`" );
 			typeName = ( vTypeNameNoGenerics.Length > 0 ) ? vTypeNameNoGenerics[0] : typeName;
 
-			if( CheckTypeSecurity( typeName ) == null ) return null;
+			if( CheckTypeSecurity( typeName ) == null ) return false;
 			foreach( Type tt in typeInfo.GenericTypeArguments )
 			{
-				if( CheckTypeSecurityRecursive( tt ) == null ) return null;
+				if( !CheckTypeSecurityRecursive( tt ) ) return false;
 			}
-			return t;
+			return true;
 		}
 
 		////////////////////////////////////////////////////////////////////////////////////
@@ -329,6 +329,7 @@ namespace Cilbox
 		public bool IsCilboxInternalType( String typeName )
 		{
 			if( box.classes.ContainsKey( typeName ) ) return true;
+			if( box.cilboxEnums != null && box.cilboxEnums.ContainsKey( typeName ) ) return true;
 
 			// Strip array suffix: "Foo.Bar[]" or "Foo.Bar[][]" -> "Foo.Bar"
 			int bracket = typeName.IndexOf( '[' );
@@ -338,6 +339,7 @@ namespace Cilbox
 			if( baseName.EndsWith('&') ) baseName = baseName.Substring( 0, baseName.Length - 1 );
 
 			if( box.classes.ContainsKey( baseName ) ) return true;
+			if( box.cilboxEnums != null && box.cilboxEnums.ContainsKey( baseName ) ) return true;
 
 			return false;
 		}
@@ -345,6 +347,8 @@ namespace Cilbox
 		public Type GetNativeTypeFromSerializee( Serializee s )
 		{
 			Dictionary< String, Serializee > ses = s.AsMap();
+			Serializee utSer;
+			if( ses.TryGetValue( "ut", out utSer ) ) return GetNativeTypeFromSerializee( utSer );
 			String typeName = ses["n"].AsString();
 			String assemblyName = ses["a"].AsString();
 			if( IsCilboxInternalType( typeName ) ) return null;
@@ -395,6 +399,8 @@ namespace Cilbox
 		public String GetNativeTypeNameFromSerializee( Serializee s )
 		{
 			Dictionary< String, Serializee > ses = s.AsMap();
+			Serializee utSer;
+			if( ses.TryGetValue( "ut", out utSer ) ) return GetNativeTypeNameFromSerializee( utSer );
 			String typeName = ses["n"].AsString();
 			if( IsCilboxInternalType( typeName ) ) return typeName;
 			typeName = CheckReplaceTypeNotRecursive( typeName );

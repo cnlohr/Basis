@@ -29,7 +29,7 @@ public class BasisObjectSyncNetworking : BasisNetworkBehaviour
         {
             BasisPickupInteractable.CanHoverInjected.Add(CanHover);
             BasisPickupInteractable.CanInteractInjected.Add(CanInteract);
-            BasisPickupInteractable.OnInteractStartEvent += OnInteractStartEvent;
+            BasisPickupInteractable.OnInteractStartEvent.AddListener(OnInteractStartEvent);
         }
         if (BasisPickupInteractable.RigidRef != null)
         {
@@ -46,7 +46,7 @@ public class BasisObjectSyncNetworking : BasisNetworkBehaviour
         {
             BasisPickupInteractable.CanHoverInjected.Remove(CanHover);
             BasisPickupInteractable.CanInteractInjected.Remove(CanInteract);
-            BasisPickupInteractable.OnInteractStartEvent -= OnInteractStartEvent;
+            BasisPickupInteractable.OnInteractStartEvent.RemoveListener(OnInteractStartEvent);
         }
     }
     public override void OnDestroy()

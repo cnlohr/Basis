@@ -158,7 +158,7 @@ public abstract class BasisHandHeldCameraInteractable : BasisPickupInteractable
             HHC.captureCamera.transform.GetLocalPositionAndRotation(out cameraStartingLocalPos, out cameraStartingLocalRot);
         }
 
-        OnInteractStartEvent += OnInteractDesktopTweak;
+        OnInteractStartEvent.AddListener( OnInteractDesktopTweak );
         BasisDeviceManagement.OnBootModeChanged += OnBootModeChanged;
 
         BasisLocalPlayer.OnPlayersHeightChangedNextFrame += OnHeightChanged;
@@ -636,7 +636,7 @@ public abstract class BasisHandHeldCameraInteractable : BasisPickupInteractable
     public override void OnDestroy()
     {
         BasisDeviceManagement.OnBootModeChanged -= OnBootModeChanged;
-        OnInteractStartEvent -= OnInteractDesktopTweak;
+        OnInteractStartEvent.RemoveListener(OnInteractDesktopTweak);
         BasisLocalPlayer.OnPlayersHeightChangedNextFrame -= OnHeightChanged;
 
         BasisLocalPlayer.AfterSimulateOnLate.RemoveAction(202, UpdateCamera);
